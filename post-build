@@ -1,0 +1,13 @@
+#!/bin/bash
+
+arm-none-eabi-objcopy -O ihex "${1}" "${1}.hex"
+
+arm-none-eabi-objcopy -O binary "${1}" "${1}.bin"
+arm-none-eabi-objdump -C -D "${1}" > "${1}.S"
+
+cp "${1}.bin" "${1}.dfu"
+dfu-suffix -v ffff -p 12c9 -a "${1}.dfu"
+
+arm-none-eabi-size "${1}"
+
+
