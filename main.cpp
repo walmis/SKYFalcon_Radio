@@ -1,3 +1,7 @@
+
+#define USB_PRODUCT_STRING		"SKY.Falcon Radio Module"
+#define USB_MANUFACTURER_STRING	"SKYVideo.pro"
+
 #include <unistd.h>
 #include <xpcc/architecture.hpp>
 #include <xpcc/processing.hpp>
@@ -20,7 +24,7 @@ USBSerial usb(0xffff, 0x12c9, 0);
 MAVHandler mavHandler;
 xpcc::lpc11::BufferedUart uart1(115200, 256, 64);
 
-bool boot_detach;
+volatile bool boot_detach;
 
 enum { r0, r1, r2, r3, r12, lr, pc, psr};
 
@@ -74,9 +78,16 @@ void Hard_Fault_Handler(uint32_t stack[]) {
 void tick() {
 	dbgPin::toggle();
 	lpc11u::Watchdog::feed();
-	if(!progPin::read()) {
+
+	if(boot_detach) {
+		LPC_PMU->GPREG3 |= 0x01;
 		NVIC_SystemReset();
 	}
+
+
+//	if(!progPin::read()) {
+//		NVIC_SystemReset();
+//	}
 }
 
 //aes128_ctx_t ctx;
@@ -86,9 +97,9 @@ void tick() {
 
 void idle() {
 
-	if(!progPin::read()) {
-		NVIC_SystemReset();
-	}
+//	if(!progPin::read()) {
+//		NVIC_SystemReset();
+//	}
 
 	static PeriodicTimer<> t(1000);
 	if(t.isExpired()) {
@@ -113,14 +124,11 @@ void idle() {
 
 //		XPCC_LOG_DEBUG .printf("freemem %d\n", (uint32_t)&__heap_end - (uint32_t)sbrk(0));
 //
-//		XPCC_LOG_DEBUG .printf("TX %d/%d\n",  radio.getTxGood(), radio.getTxBad());
-//		XPCC_LOG_DEBUG .printf("RX %d/%d\n",  radio.getRxGood(), radio.getRxBad());
-//		XPCC_LOG_DEBUG .printf("RSSI %d / Noise %d\n",  radio.getRssi(),radio.getNoiseFloor());
+		XPCC_LOG_DEBUG .printf("TX %d/%d\n",  radio.getTxGood(), radio.getTxBad());
+		XPCC_LOG_DEBUG .printf("RX %d/%d\n",  radio.getRxGood(), radio.getRxBad());
+		XPCC_LOG_DEBUG .printf("RSSI %d / Noise %d\n",  radio.getRssi(),radio.getNoiseFloor());
 
-		if(boot_detach) {
-			LPC_PMU->GPREG3 |= 0x01;
-			NVIC_SystemReset();
-		}
+
 	}
 
 //	int16_t c = uart.read();
@@ -182,6 +190,7 @@ void test_osc() {
 
 void panic(const char* s) {
 	XPCC_LOG_DEBUG << s << endl;
+	while(1);
 }
 
 class DFU : public DFUHandler {
@@ -207,9 +216,65 @@ void usbclk_init() {
 	while (!(LPC_SYSCON->USBPLLSTAT & 0x01)); //wait until PLL locked
 }
 
+void bluetooth_init() {
+
+	bt_key::setOutput(1);
+	bt_rst::setOutput(0);
+	xpcc::sleep(10);
+	bt_rst::setOutput(1);
+
+	sw_rx.setBaud(38400);
+	Uart1::setBaud(38400);
+
+	IOStream uart(uart1);
+	IOStream _u(usb);
+
+	xpcc::sleep(100);
+
+	for(int i = 0; i < 20; i++) {
+		uart << "AT\r\n";
+
+		xpcc::sleep(200);
+
+		if(sw_rx.rxAvailable()) {
+
+			uart << "AT+NAME=SKYFalcon_Radio\r\n";
+			xpcc::sleep(50);
+
+			uart << "AT+UART=115200,0,0\r\n";
+			xpcc::sleep(50);
+
+			char pin[5] = "8888";
+
+			uart << "AT+PSWD=" << pin << "\r\n";
+			xpcc::sleep(50);
+
+			while(sw_rx.rxAvailable()) {
+				sw_rx.read();
+			}
+
+			bt_key::setOutput(0);
+			bt_rst::setOutput(0);
+			xpcc::sleep(10);
+			bt_rst::setOutput(1);
+
+			sw_rx.setBaud(115200);
+			Uart1::setBaud(115200);
+
+			break;
+		}
+
+	}
+
+
+
+}
+
 int main() {
 	LPC_PMU->GPREG3 |= 1;
-	lpc11u::Watchdog::init(100000);
+	lpc11u::Watchdog::init(1000000);
+
+	XPCC_LOG_DEBUG .printf("Starting clock:%d\n", SystemCoreClock);
 
 	ledRed::setOutput(true);
 	ledGreen::setOutput(true);
@@ -222,9 +287,14 @@ int main() {
 	lpc11::SysTickTimer::attachInterrupt(tick);
 	//usbConnect::setOutput(false);
 
+	bt_rst::setOutput(0);
+	bt_key::setOutput(0);
+
+	bluetooth_init();
+
 	mavHandler.radio = &radio;
 	mavHandler.usb = &usb;
-	mavHandler.uart1 = &uart1;
+	mavHandler.uart = &uart1;
 	mavHandler.bluetooth = &sw_rx;
 
 	//GpioInt::attach(0, 13, interrupt, IntEdge::RISING_EDGE);
@@ -233,8 +303,10 @@ int main() {
 //
 //	xpcc::Random::seed();
 //
-	lpc11u::SpiMaster0::configurePins(lpc11u::SpiMaster0::MappingSck::PIO0_10, false);
-	lpc11u::SpiMaster0::initialize(lpc11u::SpiMaster0::Mode::MODE_0, 8000000);
+
+	radioSpiMaster::configurePins(radioSpiMaster::MappingSck::PIO0_10, false);
+	radioSpiMaster::initialize(radioSpiMaster::Mode::MODE_0, 8000000);
+
 //
 //	ledRed::setOutput(false);
 //	ledGreen::setOutput(false);
@@ -243,7 +315,6 @@ int main() {
 //
 	usb.connect();
 	usbConnect::setOutput(true);
-
 
 	eeprom.initialize();
 

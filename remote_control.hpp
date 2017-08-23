@@ -194,6 +194,8 @@ protected:
 
 	bool configurationChanged;
 	bool newRadioDataSent;
+
+	volatile bool reset = 0;
 	////////
 };
 

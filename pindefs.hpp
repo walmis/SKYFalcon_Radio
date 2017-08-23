@@ -10,22 +10,19 @@
 
 #include <xpcc/architecture.hpp>
 
-GPIO__OUTPUT(_ledRed, 0, 4);
-GPIO__OUTPUT(_ledGreen, 0, 5);
+typedef xpcc::gpio::Invert<GPIO<0,0>> ledRed;
+typedef xpcc::gpio::Invert<GPIO<0,1>> ledGreen;
 
-typedef xpcc::gpio::Invert<_ledRed> ledRed;
-typedef xpcc::gpio::Invert<_ledGreen> ledGreen;
+typedef GPIO<0,1> progPin;
+typedef GPIO<0,13> dbgPin;
+typedef GPIO<0,17> sw_rx_pin;
+typedef GPIO<0,21> usbConnect;
+typedef GPIO<0,6> radio_irq;
+typedef GPIO<0,7> radio_sel;
 
-GPIO__INPUT(progPin, 0, 1);
-GPIO__IO(dbgPin, 0, 13);
-GPIO__INPUT(sw_rx, 0, 17);
+typedef GPIO<0,11> bt_key;
+typedef GPIO<0,15> bt_rst;
 
-GPIO__OUTPUT(usbConnect, 0, 21);
-
-GPIO__IO(radio_irq, 0, 6);
-GPIO__IO(radio_sel, 0, 7);
-
-
-typedef xpcc::lpc11u::SpiMaster0 radioSpiMaster;
+typedef xpcc::lpc11::SpiMaster0 radioSpiMaster;
 
 #endif /* PINDEFS_HPP_ */

@@ -54,6 +54,8 @@ protected:
 	void sendRadioStatus(mavlink_channel_t chan);
 	void sendRadioConf(mavlink_channel_t chan);
 
+	void injectPackets();
+
 	mavlink_status_t mavStatus;
 
 	uint8_t remSysid;

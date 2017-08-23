@@ -61,11 +61,11 @@ void SWUartRx::_isr() {
 			if (curr_bit == 8) { //stop bit
 				state = WAIT_START;
 				setCapture(true);
-				if (sw_rx::read()) { //stop bit must be positive
+				if (sw_rx_pin::read()) { //stop bit must be positive
 					buffer.write(_chr);
 				}
 			} else {
-				_chr |= (sw_rx::read() & 1) << curr_bit;
+				_chr |= (sw_rx_pin::read() & 1) << curr_bit;
 
 				Timer32B0::updateMatchValue(0, tstamp);
 			}

@@ -51,7 +51,7 @@ void rh_atomic_block_end() {
 	//__enable_irq();
 }
 
-uint32_t millis() {
+uint32_t RH::millis() {
 	return xpcc::Clock::now().getTime();
 }
 

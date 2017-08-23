@@ -12,7 +12,7 @@
 #include <xpcc/math.hpp>
 #include <RH_RF22.h>
 
-#define TOKEN 0x70
+#define TOKEN 0x73
 
 struct EEData {
 	uint8_t token;
@@ -28,11 +28,11 @@ struct EEData {
 
 const EEData eeDefaults = {
 		TOKEN,
-		429000000,
+		433000000,
 		50000,
-		RH_RF22_TXPOW_1DBM,
-		10,
-		100,
+		RH_RF22_TXPOW_14DBM,
+		0,
+		60,
 		RH_RF22::GFSK_Rb57_6Fd28_8,
 };
 

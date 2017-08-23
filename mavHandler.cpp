@@ -5,8 +5,8 @@
  *      Author: walmis
  */
 
-#include <mavHandler.hpp>
-#include <remote_control.hpp>
+#include "mavHandler.hpp"
+#include "remote_control.hpp"
 
 mavlink_system_t mavlink_system;
 
@@ -21,6 +21,33 @@ MAVHandler::MAVHandler(uint8_t sysid) : sysid(sysid) {
 	usb = 0;
 	mavlink_system.sysid = sysid;
 	mavlink_system.compid = 1;
+}
+
+void MAVHandler::injectPackets() {
+	//make sure we are not in a middle of a mavlink message before injecting our messages
+	static xpcc::Timeout<> heartBeatTimer(1000);
+	static xpcc::Timeout<> statusUpdateTimer(200);
+	static xpcc::Timeout<> messageTimeout(1000);
+
+	if(messageTimeout.isExpired() || mavStatus.parse_state <= MAVLINK_PARSE_STATE_IDLE) {
+		messageTimeout.restart(1000);
+		if(heartBeatTimer.isExpired()) {
+			sendRadioConf(CHAN_UART);
+
+			if(radio->txAvailable() >= (MAVLINK_MSG_ID_HEARTBEAT_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES)) {
+				mavlink_msg_heartbeat_send(CHAN_RADIO, MAV_TYPE_GCS, MAV_AUTOPILOT_INVALID,
+						MAV_MODE_MANUAL_ARMED, 0, MAV_STATE_ACTIVE);
+
+				heartBeatTimer.restart(1000);
+			}
+		}
+
+		if(statusUpdateTimer.isExpired()) {
+			sendRadioStatus(CHAN_USB);
+			sendRadioStatus(CHAN_UART);
+			statusUpdateTimer.restart(200);
+		}
+	}
 }
 
 void MAVHandler::handleTick() {
@@ -41,6 +68,8 @@ void MAVHandler::handleTick() {
 
 			parseCharFromRadio(c);
 			avail--;
+
+			injectPackets();
 		}
 	}
 
@@ -82,31 +111,7 @@ void MAVHandler::handleTick() {
 		}
 	}
 
-	static xpcc::Timeout<> heartBeatTimer(1000);
-	static xpcc::Timeout<> statusUpdateTimer(200);
-	static xpcc::Timeout<> messageTimeout(1000);
 
-	//make sure we are not in a middle of a mavlink message before injecting our messages
-	mavlink_status_t* status = mavlink_get_channel_status(CHAN_RADIO);
-	if(messageTimeout.isExpired() || status->parse_state <= MAVLINK_PARSE_STATE_IDLE) {
-		messageTimeout.restart(1000);
-		if(heartBeatTimer.isExpired()) {
-			sendRadioConf(CHAN_UART);
-
-			if(radio->txAvailable() >= (MAVLINK_MSG_ID_HEARTBEAT_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES)) {
-				mavlink_msg_heartbeat_send(CHAN_RADIO, MAV_TYPE_GCS, MAV_AUTOPILOT_INVALID,
-						MAV_MODE_MANUAL_ARMED, 0, MAV_STATE_ACTIVE);
-
-				heartBeatTimer.restart(1000);
-			}
-		}
-
-		if(statusUpdateTimer.isExpired()) {
-			sendRadioStatus(CHAN_USB);
-			sendRadioStatus(CHAN_UART);
-			statusUpdateTimer.restart(200);
-		}
-	}
 
 }
 
@@ -125,10 +130,10 @@ void MAVHandler::sendRadioStatus(mavlink_channel_t chan) {
 	st.remNoise = radio->getRemNoise();
 	st.remRssi = radio->getRemRssi();
 
-	mavlink_system.sysid = remSysid;
-	mavlink_msg_data16_send(chan, RADIO_STATUS, sizeof(RadioStatus), data);
-	mavlink_system.sysid = sysid;
 
+	mavlink_msg_data16_send(chan, RADIO_STATUS, sizeof(RadioStatus), data);
+
+	//mavlink_system.sysid = remSysid;
 	mavlink_msg_radio_send(chan,
 			((radio->getRssi()+127)*190UL)/100,
 			((radio->getRemRssi()+127)*190UL)/100,
@@ -137,6 +142,7 @@ void MAVHandler::sendRadioStatus(mavlink_channel_t chan) {
 			((radio->getRemNoise()+127)*190UL)/100,
 			radio->getRxBad(), 0);
 
+	//mavlink_system.sysid = sysid;
 }
 
 void MAVHandler::sendRadioConf(mavlink_channel_t chan) {
@@ -152,10 +158,10 @@ void MAVHandler::sendRadioConf(mavlink_channel_t chan) {
 	st.afc = radio->getAfcPullIn();
 	st.txPower = radio->getTxPower();
 
-	mavlink_system.sysid = remSysid;
+	//mavlink_system.sysid = remSysid;
 	mavlink_msg_data16_send(chan, CURRENT_RADIO_CONFIGURATION, sizeof(RadioStatus), data);
 
-	mavlink_system.sysid = sysid;
+	//mavlink_system.sysid = sysid;
 }
 
 void MAVHandler::parseCharLocal(mavlink_channel_t chan, uint8_t c) {

@@ -7,10 +7,24 @@
 
 #include "remote_control.hpp"
 #include "radio.hpp"
-#include <Axes.hpp>
+#include  "Axes.hpp"
 
 void RemoteControl::handleInit() {
-	Radio::handleInit();
+
+	static bool hw_init = false;
+	if(!hw_init) {
+		xpcc::TickerTask::sleep(40);
+		if(!this->RH_RF22::HWinit()) {
+			panic("radio HW init fail");
+		}
+		hw_init = true;
+	}
+
+
+	if(!this->RH_RF22::init()) {
+		panic("radio init fail");
+	}
+
 
 	eeprom.get(&EEData::rfFrequency, freq);
 	eeprom.get(&EEData::afcPullIn, afcPullIn);
@@ -18,6 +32,8 @@ void RemoteControl::handleInit() {
 	eeprom.get(&EEData::modemCfg, modemCfg);
 	eeprom.get(&EEData::txInterval, txInterval);
 	eeprom.get(&EEData::fhChannels, numFhChannels);
+
+	XPCC_LOG_DEBUG .printf("init radio f:%d txpw:%d fh:%d\n", freq, txPower, numFhChannels );
 
 	txPacketTimer.restart(txInterval);
 
@@ -58,6 +74,7 @@ void RemoteControl::handleRxStart() {
 
 void RemoteControl::handleReset() {
 	XPCC_LOG_DEBUG << "RADIO RESET OCCURED\n";
+	//reset = 1;
 }
 
 bool RemoteControl::clearChannel() {
@@ -75,6 +92,9 @@ void RemoteControl::handleTick() {
 	//	XPCC_LOG_DEBUG << "isr missed\n";
 		//RH_RF22::isr0();
 	//}
+	if(reset) {
+		handleInit();
+	}
 
 	if (!transmitting()) {
 		ledRed::reset();
