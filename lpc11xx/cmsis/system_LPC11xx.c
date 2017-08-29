@@ -154,7 +154,7 @@
 #define SYSAHBCLKDIV_Val      0x00000001
 
 #ifdef __ARM_LPC11UXX__
-#define AHBCLKCTRL_Val        0x0189005F //GPIO enabled
+#define AHBCLKCTRL_Val        (0x0189005F | (1<<15) /* WDT */) //GPIO enabled
 #else
 #define AHBCLKCTRL_Val        0x0001005F
 #endif
