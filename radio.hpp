@@ -16,14 +16,10 @@ extern void panic(const char* s);
 
 using namespace xpcc;
 
-class Radio : TickerTask, public RH_RF22 {
+class Radio : public RH_RF22 {
 public:
 	Radio() : RH_RF22((radio_sel::port<<5)|radio_sel::pin,
 			(radio_irq::port<<5)|radio_irq::pin) {
-
-	}
-
-	void handleInit() {
 
 	}
 

@@ -15,6 +15,8 @@
 #include "pindefs.hpp"
 #include "remote_control.hpp"
 
+#define SWD 1
+
 using namespace xpcc;
 using namespace lpc11;
 
@@ -35,7 +37,7 @@ extern "C" void HardFault_Handler(void)
 }
 
 NullIODevice null;
-xpcc::log::Logger xpcc::log::debug(null);
+xpcc::log::Logger xpcc::log::debug(uart1);
 
 extern "C"
 void Hard_Fault_Handler(uint32_t stack[]) {
@@ -220,6 +222,7 @@ void bluetooth_init() {
 
 	bt_key::setOutput(1);
 	bt_rst::setOutput(0);
+
 	xpcc::sleep(10);
 	bt_rst::setOutput(1);
 
@@ -272,7 +275,7 @@ void bluetooth_init() {
 
 int main() {
 	LPC_PMU->GPREG3 |= 1;
-	lpc11u::Watchdog::init(1000000);
+	//lpc11u::Watchdog::init(1000000);
 
 	XPCC_LOG_DEBUG .printf("Starting clock:%d\n", SystemCoreClock);
 
@@ -283,14 +286,14 @@ int main() {
 
 	usbclk_init();
 
-	lpc11::SysTickTimer::enable();
 	lpc11::SysTickTimer::attachInterrupt(tick);
 	//usbConnect::setOutput(false);
+#ifndef SWD
 
 	bt_rst::setOutput(0);
 	bt_key::setOutput(0);
-
 	bluetooth_init();
+#endif
 
 	mavHandler.radio = &radio;
 	mavHandler.usb = &usb;
@@ -303,10 +306,10 @@ int main() {
 //
 //	xpcc::Random::seed();
 //
-
+#ifndef SWD
 	radioSpiMaster::configurePins(radioSpiMaster::MappingSck::PIO0_10, false);
 	radioSpiMaster::initialize(radioSpiMaster::Mode::MODE_0, 8000000);
-
+#endif
 //
 //	ledRed::setOutput(false);
 //	ledGreen::setOutput(false);

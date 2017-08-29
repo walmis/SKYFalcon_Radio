@@ -33,11 +33,11 @@ int putchar(int c) {
 }
 
 void delay(uint32_t millis) {
-	xpcc::delay_ms(millis);
+	//xpcc::delay_ms(millis);
 }
 
 void rh_yield() {
-	xpcc::TickerTask::yield();
+	//xpcc::TickerTask::yield();
 }
 
 
