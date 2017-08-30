@@ -1,2 +1,7 @@
 /Release
 /Debug
+CMakeFiles
+xpcc.build
+CMakeCache.txt
+Makefile
+SKYFalcon_*

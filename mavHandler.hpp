@@ -31,7 +31,7 @@ extern void comm_send_buffer(mavlink_channel_t chan, const uint8_t* buffer, uint
 //#include "mavlink/common/mavlink.h"
 #include "mavlink/ardupilotmega/mavlink.h"
 
-class MAVHandler final : xpcc::TickerTask {
+class MAVHandler {
 public:
 	MAVHandler(uint8_t sysid = 250);
 

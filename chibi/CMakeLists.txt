@@ -28,7 +28,9 @@ target_sources(${PROJECT_NAME} PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/xpcc/event.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/xpcc/irq_wrapper.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/xpcc/semaphore.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/xpcc/r_mutex.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/xpcc/util.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/xpcc/timer.cpp
 )
 
 # ADD_LIBRARY(chibi STATIC

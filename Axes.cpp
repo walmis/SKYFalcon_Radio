@@ -55,5 +55,6 @@ void Axes::isr() {
 
 extern "C"
 void TIMER16_1_IRQHandler() {
+	IRQWrapper w;
 	axes.isr();
 }

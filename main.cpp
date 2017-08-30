@@ -14,6 +14,7 @@
 
 #include "pindefs.hpp"
 #include "remote_control.hpp"
+#include <ch.h>
 
 #define SWD 1
 
@@ -33,10 +34,25 @@ volatile bool boot_detach;
 
 enum { r0, r1, r2, r3, r12, lr, pc, psr};
 
-extern "C" void HardFault_Handler(void)
+extern "C" void HardFault_Handler(void) __attribute__((naked));
+extern "C" void HardFault_Handler(void) //__attribute__((naked))
 {
-  asm volatile("MRS r0, MSP;"
-		       "B Hard_Fault_Handler");
+  //asm volatile("  TST LR, #4; ");
+  register long lr asm("lr");
+  if(lr & 4) {
+	  asm("mrs r0, msp");
+  } else {
+	  asm("mrs r0, psp");
+  }
+  asm("mov sp, r0");
+  asm("bkpt");
+
+
+//				  ITE EQ;  \
+//				  MRSEQ R0, MSP;  \
+//				  MRSNE R0, PSP; \
+//		       	  B Hard_Fault_Handler;");
+	//__get
 }
 
 NullIODevice null;
@@ -49,20 +65,20 @@ void Hard_Fault_Handler(uint32_t stack[]) {
 
 //	ledGreen::set(0);
 //	ledRed::setOutput(0);
-//	Uart1::init(115200);
-//	IODeviceWrapper<Uart1> d;
-//	IOStream w(d);
+	Uart1::init(115200);
+	IODeviceWrapper<Uart1> d;
+	IOStream w(d);
 //////
 //	w.printf("Hard Fault\n");
 ////
-//	w.printf("r0  = 0x%08x\n", stack[r0]);
-//	w.printf("r1  = 0x%08x\n", stack[r1]);
-//	w.printf("r2  = 0x%08x\n", stack[r2]);
-//	w.printf("r3  = 0x%08x\n", stack[r3]);
-//	w.printf("r12 = 0x%08x\n", stack[r12]);
-//	w.printf("lr  = 0x%08x\n", stack[lr]);
-//	w.printf("pc  = 0x%08x\n", stack[pc]);
-//	w.printf("psr = 0x%08x\n", stack[psr]);
+	w.printf("r0  = 0x%08x\n", stack[r0]);
+	w.printf("r1  = 0x%08x\n", stack[r1]);
+	w.printf("r2  = 0x%08x\n", stack[r2]);
+	w.printf("r3  = 0x%08x\n", stack[r3]);
+	w.printf("r12 = 0x%08x\n", stack[r12]);
+	w.printf("lr  = 0x%08x\n", stack[lr]);
+	w.printf("pc  = 0x%08x\n", stack[pc]);
+	w.printf("psr = 0x%08x\n", stack[psr]);
 //
 //	LPC_PMU->GPREG3 |= 1;
 //	NVIC_SystemReset();
@@ -85,10 +101,7 @@ void tick() {
 	dbgPin::toggle();
 	//lpc11u::Watchdog::feed();
 
-	if(boot_detach) {
-		LPC_PMU->GPREG3 |= 0x01;
-		NVIC_SystemReset();
-	}
+
 
 
 //	if(!progPin::read()) {
@@ -273,39 +286,22 @@ void bluetooth_init() {
 		}
 
 	}
-
-
-
 }
 
-int main() {
-	//lpc11u::Watchdog::init(1000000);
-	__enable_irq();
+Event evt;
 
+RMutex mtx;
+
+
+THD_WORKING_AREA(wa_main_thread, 256);
+void main_thread(void*) {
 	XPCC_LOG_DEBUG .printf("Starting clock:%d\n", SystemCoreClock);
+	XPCC_LOG_DEBUG .printf("Free heap:%d\n", (int)(&__heap_end__)-(int)(&__heap_base__));
 
-	//LPC_PMU->GPREG3 = 0;
-	//lpc11u::Watchdog::init(1000000);
 	ledRed::setOutput(true);
 	ledGreen::setOutput(true);
 
 	usb.addInterfaceHandler(dfu);
-
-	usbclk_init();
-
-	lpc11::SysTickTimer::attachInterrupt(tick);
-	//usbConnect::setOutput(false);
-
-	PeriodicTimer<> t(500);
-	while(1) {
-
-		if(t.isExpired()) {
-			XPCC_LOG_DEBUG.printf("alive\n");
-			lpc11u::Watchdog::feed();
-		}
-
-
-	}
 
 
 #ifndef SWD
@@ -329,12 +325,7 @@ int main() {
 	radioSpiMaster::configurePins(radioSpiMaster::MappingSck::PIO0_10, false);
 	radioSpiMaster::initialize(radioSpiMaster::Mode::MODE_0, 8000000);
 #endif
-//
-//	ledRed::setOutput(false);
-//	ledGreen::setOutput(false);
-//
-//	//usbclk_init();
-//
+
 	usb.connect();
 	usbConnect::setOutput(true);
 
@@ -347,6 +338,42 @@ int main() {
 	NVIC_SetPriority(TIMER_16_1_IRQn, 2); //PPM decoder
 	NVIC_SetPriority(TIMER_32_0_IRQn, 0); //SW uart has max priority
 
-	LPC_PMU->GPREG3 = 0; //tell bootloader: boot OK
-	xpcc::TickerTask::tasksRun(idle);
+	//LPC_PMU->GPREG3 = 0; //tell bootloader: boot OK
+
+	while(1) {
+		chThdSleep(MS2ST(100));
+
+		XPCC_LOG_DEBUG.printf("alive\n");
+	}
+}
+
+THD_WORKING_AREA(wa_test_thread, 128);
+void test(void*) {
+	while(1) {
+		chThdSleep(MS2ST(1000));
+
+	}
+}
+
+THD_TABLE_BEGIN
+  THD_TABLE_ENTRY(wa_main_thread, "main", main_thread, NULL)
+  THD_TABLE_ENTRY(wa_test_thread, "hello", test, NULL)
+THD_TABLE_END
+
+extern "C" void port_timer_init();
+int main() {
+	usbclk_init();
+	port_timer_init();
+	chSysInit();
+
+	while(1) {
+
+		if(boot_detach) {
+			LPC_PMU->GPREG3 = 255;
+			NVIC_SystemReset();
+		}
+
+		lpc11u::Watchdog::feed();
+
+	}
 }

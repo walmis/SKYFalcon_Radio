@@ -42,7 +42,7 @@
  * @note    This number is not inclusive of the idle thread which is
  *          Implicitly handled.
  */
-#define CH_CFG_NUM_THREADS                  3
+#define CH_CFG_NUM_THREADS                  2
 
 /** @} */
 
@@ -65,7 +65,7 @@
  *          option defines the maximum amount of time allowed for
  *          timeouts.
  */
-#define CH_CFG_ST_FREQUENCY                 1000
+#define CH_CFG_ST_FREQUENCY                 1000000
 
 /**
  * @brief   Time delta constant for the tick-less mode.
@@ -75,7 +75,7 @@
  *          The value one is not valid, timeouts are rounded up to
  *          this value.
  */
-#define CH_CFG_ST_TIMEDELTA                 0
+#define CH_CFG_ST_TIMEDELTA                 64
 
 /** @} */
 
