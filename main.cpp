@@ -1,6 +1,6 @@
 
-#define USB_PRODUCT_STRING		"SKY.Falcon Radio Module"
-#define USB_MANUFACTURER_STRING	"SKYVideo.pro"
+//#define USB_PRODUCT_STRING		"SKY.Falcon Radio Module"
+//#define USB_MANUFACTURER_STRING	"SKYVideo.pro"
 
 #include <unistd.h>
 #include <xpcc/architecture.hpp>
@@ -10,12 +10,11 @@
 #include "SwUart.hpp"
 #include "Axes.hpp"
 #include "mavHandler.hpp"
-#include <xpcc/driver/connectivity/usb/USBDevice.hpp>
+#include <xpcc/driver/connectivity/usb/USBDevice/USBSerial/USBSerial.h>
 
 #include "pindefs.hpp"
 #include "remote_control.hpp"
 #include <ch.h>
-
 #define SWD 1
 
 using namespace xpcc;
@@ -23,7 +22,8 @@ using namespace lpc11;
 
 Axes axes;
 RemoteControl radio;
-USBSerial usb(0xffff, 0x12c9, 0);
+//0xffff, 0x12c9, 0
+USBSerial usb;
 MAVHandler mavHandler;
 
 StaticIOBuffer<256> txbuf;
