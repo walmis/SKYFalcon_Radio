@@ -90,6 +90,7 @@ void SWUartRx::setCapture(bool en) {
 SWUartRx sw_rx(115200);
 
 extern "C" void TIMER32_0_IRQHandler() {
+	IRQWrapper w;
 	sw_rx._isr();
 }
 
