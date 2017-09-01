@@ -1,7 +1,3 @@
-
-//#define USB_PRODUCT_STRING		"SKY.Falcon Radio Module"
-//#define USB_MANUFACTURER_STRING	"SKYVideo.pro"
-
 #include <unistd.h>
 #include <xpcc/architecture.hpp>
 #include <xpcc/processing.hpp>
@@ -19,6 +15,10 @@
 
 using namespace xpcc;
 using namespace lpc11;
+
+USB_PRODUCT_STRING("SKYFalcon Radio");
+USB_MANUFACTURER_STRING("Ensys.lt");
+USB_SERIAL_STRING(GITVER);
 
 Axes axes;
 RemoteControl radio;

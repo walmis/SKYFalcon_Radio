@@ -3,10 +3,11 @@ cmake_minimum_required(VERSION 3.5)
 SET(XPCC_DIR ${CMAKE_SOURCE_DIR}/../xpcc/)
 SET(PLATFORM "lpc11Uxx")
 SET(PROJECT_NAME "SKYFalcon_Radio")
-#SET(LINKER_SCRIPT "${CMAKE_SOURCE_DIR}/lpc11xx/linkscript.ld")
-#SET(XPCC_CMAKE_DEFINES "-DCHIBI_RTOS=1")
-#SET(LIBRARIES "${CMAKE_SOURCE_DIR}/../ardupilot/ArduCopter/libArduCopter.a") #additional libraries
-SET(XPCC_CMAKE_DEFINES "-DCHIBI_RTOS=1")
+
+SET(XPCC_CMAKE_DEFINES -DCHIBI_RTOS=1)
+
+set(USB_PRODUCT_ID 0x12c9)
+set(USB_VENDOR_ID 0xffff)
 
 SET(LINKER_FLASH_ORIGIN "0x00001000")
 SET(LINKER_FLASH_LENGTH "28k")
@@ -32,10 +33,21 @@ set(SOURCES
     ./lpc11xx/cmsis/system_LPC11xx.c
 )
 
+execute_process(COMMAND
+  git describe --match=NeVeRmAtCh --always --abbrev=8 --dirty
+  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+  OUTPUT_VARIABLE GITVER
+  ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+  
+
+
 include(${XPCC_DIR}/xpccProject.cmake)
 
 project(${PROJECT_NAME} CXX C)
 
+add_definitions(-DGITVER="${GITVER}")
+message(STATUS "GIT Version: ${GITVER}")
+ 
 set(CMAKE_INCLUDE_SYSTEM_FLAG_CXX "-I")
 set(CMAKE_INCLUDE_SYSTEM_FLAG_C "-I")
 

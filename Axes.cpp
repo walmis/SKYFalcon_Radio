@@ -11,7 +11,7 @@ using namespace xpcc;
 using namespace xpcc::lpc11;
 
 Axes::Axes() {
-	Timer16B1::init(TimerMode::TIMER_MODE, 1, PrescaleMode::PRESCALE_USVAL);
+	Timer16B1::init(TimerMode::TIMER_MODE, 48, PrescaleMode::PRESCALE_TICKVAL);
 	Timer16B1::configCapture((CaptureFlags)(CaptureFlags::FALLING_EDGE | CaptureFlags::INT_ON_CAPTURE));
 	Timer16B1::enableCapturePins();
 

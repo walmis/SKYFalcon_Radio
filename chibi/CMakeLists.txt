@@ -31,6 +31,7 @@ target_sources(${PROJECT_NAME} PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/xpcc/r_mutex.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/xpcc/util.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/xpcc/timer.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/xpcc/malloc.c
 )
 
 # ADD_LIBRARY(chibi STATIC
