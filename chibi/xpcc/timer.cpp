@@ -51,6 +51,12 @@ systime_t port_timer_get_alarm(void) {
 
 extern "C"
 void port_timer_set_alarm(systime_t time) {
+	if(Timer32B1::getCounterValue() > time) {
+		//XPCC_LOG_DEBUG .printf("timer is in the future %d\n", time);
+		//timer is in the future, probably due to debug
+		//to prevent hang, rewind the timer
+		Timer32B1::setCounterValue(time - 20);
+	}
 	Timer32B1::updateMatchValue(0, time);
 }
 
