@@ -8,8 +8,9 @@
 #ifndef REMOTE_CONTROL_HPP_
 #define REMOTE_CONTROL_HPP_
 
-#include "radio.hpp"
+#include <xpcc/processing/timeout.hpp>
 #include "eeprom/eeprom.hpp"
+#include "pindefs.hpp"
 
 enum PacketType {
 	PACKET_RC = 100,
@@ -42,13 +43,15 @@ struct RCPacket : Packet{
 	int16_t channels[16];
 } __attribute__((packed));
 
-class RemoteControl final : public Radio, public BufferedIODevice {
+class RemoteControl final : public RH_RF22, public BufferedIODevice {
 public:
-	RemoteControl() :
-		BufferedIODevice(256, 256),
+	RemoteControl() : RH_RF22((radio_sel::port<<5)|radio_sel::pin,
+		(radio_irq::port<<5)|radio_irq::pin),
+		BufferedIODevice(txbuf, txbuf),
 		txPacketTimer(20),
 		dataLen(0),
-		num_retries(0)
+		num_retries(0),
+		sending(0)
 	{}
 
 	RCPacket rcData;
@@ -150,6 +153,26 @@ public:
 		return remRssi;
 	}
 
+    inline uint16_t getRxBad() {
+    	return _rxBad;
+    }
+
+    inline uint16_t getRxGood() {
+    	return _rxGood;
+    }
+
+    inline uint16_t getTxGood() {
+    	return _txGood;
+    }
+
+    bool transmitting() {
+    	return mode() == RHModeTx;
+    }
+
+    bool idle() {
+    	return mode() == RHModeIdle;
+    }
+
 protected:
 	friend class FreqConf;
 
@@ -157,6 +180,12 @@ protected:
 	void handleRxComplete() override;
 	void handleRxStart() override;
 	void handleReset() override;
+	void handleInterrupt() override;
+
+	xpcc::Event irqEvent;
+	xpcc::Event dataEvent;
+
+
 
 	uint8_t noiseFloor;
 	uint8_t rssi;
@@ -174,9 +203,10 @@ protected:
 	uint32_t _txBad;
 
 	uint8_t packetBuf[255];
+	uint8_t rxDataLen;
 	uint8_t dataLen;
 
-	Timeout<> txPacketTimer;
+	xpcc::Timeout<> txPacketTimer;
 
 	///configuration parameters////
 	uint32_t freq;
@@ -186,6 +216,9 @@ protected:
 	RH_RF22::ModemConfigChoice modemCfg;
 	uint8_t numFhChannels; //Frequency hopping channels
 	///////////////////////////////
+
+	StaticIOBuffer<256> txbuf;
+	StaticIOBuffer<256> rxbuf;
 
 	uint8_t num_retries;
 	const uint8_t max_retries = 10;

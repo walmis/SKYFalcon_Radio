@@ -22,7 +22,6 @@ USB_SERIAL_STRING(GITVER);
 
 Axes axes;
 RemoteControl radio;
-//0xffff, 0x12c9, 0
 USBSerial usb;
 MAVHandler mavHandler;
 
@@ -85,34 +84,6 @@ void Hard_Fault_Handler(uint32_t stack[]) {
 	while(1) {}
 }
 
-//extern "C" void fault_handler() {
-//	//ledGreen::set(0);
-//	//ledRed::set();
-//	dbgPin::setOutput(false);
-//	//NVIC_SystemReset();
-//	while(1) {
-//		if(!progPin::read()) {
-//			NVIC_SystemReset();
-//		}
-//	}
-//}
-
-void tick() {
-	dbgPin::toggle();
-	//lpc11u::Watchdog::feed();
-
-
-
-
-//	if(!progPin::read()) {
-//		NVIC_SystemReset();
-//	}
-}
-
-//aes128_ctx_t ctx;
-//AVXTEA xtea;
-
-//uint8_t data[256];
 
 void idle() {
 
@@ -287,11 +258,6 @@ void bluetooth_init() {
 
 	}
 }
-
-Event evt;
-
-RMutex mtx;
-
 
 THD_WORKING_AREA(wa_main_thread, 256);
 void main_thread(void*) {

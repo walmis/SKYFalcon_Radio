@@ -6,6 +6,7 @@
 #include <stdarg.h>
 #include "pindefs.hpp"
 #include <stdio.h>
+#include <ch.h>
 
 int printf(const char* fmt, ...) {
 	va_list ap;

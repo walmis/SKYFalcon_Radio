@@ -6,7 +6,6 @@
  */
 
 #include "remote_control.hpp"
-#include "radio.hpp"
 #include  "Axes.hpp"
 
 void RemoteControl::handleInit() {
@@ -37,15 +36,15 @@ void RemoteControl::handleInit() {
 
 	txPacketTimer.restart(txInterval);
 
-	Radio::setFHStepSize(10);
-	Radio::setFrequency(freq, afcPullIn);
-	Radio::setTxPower(txPower);
-	Radio::setModemConfig(modemCfg);
+	setFHStepSize(10);
+	setFrequency(freq, afcPullIn);
+	setTxPower(txPower);
+	setModemConfig(modemCfg);
 
 }
 
 uint8_t RemoteControl::getLinkQuality() {
-	if(Clock::now() - radio.getLastPreambleTime() > 250) {
+	if(xpcc::Clock::now() - radio.getLastPreambleTime() > 250) {
 		return 0;
 	}
 	int percent = 2 * (radio.lastRssi() + 100);
@@ -54,24 +53,42 @@ uint8_t RemoteControl::getLinkQuality() {
 	return percent;
 }
 
+//called from irq thread context
 void RemoteControl::handleTxComplete() {
 	if(numFhChannels)
 		setFHChannel((rcData.seq^0x55) % numFhChannels);
 
 	busy_rx = false;
 	setModeRx();
+
+	dataEvent.signal();
 }
 
+//called from irq thread context
 void RemoteControl::handleRxComplete() {
 	busy_rx = false;
 	rssi = (7*rssi + (uint8_t)lastRssi()) / 8;
 	ledGreen::reset();
+
+	if(available()) {
+		if(rxDataLen) {
+			XPCC_LOG_DEBUG .printf("packet not cleared\n");
+		}
+		rxDataLen = sizeof(packetBuf);
+		if(!recv(packetBuf, &rxDataLen) ) {
+			rxDataLen = 0;
+		}
+
+		dataEvent.signal();
+	}
 }
 
+//called from irq thread context
 void RemoteControl::handleRxStart() {
 	ledGreen::set();
 }
 
+//called from irq thread context
 void RemoteControl::handleReset() {
 	XPCC_LOG_DEBUG << "RADIO RESET OCCURED\n";
 	//reset = 1;
@@ -98,24 +115,20 @@ void RemoteControl::handleTick() {
 
 	if (!transmitting()) {
 		ledRed::reset();
-		if(available()) {
-			uint8_t buf[255];
-			uint8_t len = sizeof(buf);
-
-			recv(buf, &len);
-			if(len >= sizeof(Packet)) {
-				Packet* p = (Packet*)buf;
+		if(rxDataLen) {
+			if(rxDataLen >= sizeof(Packet)) {
+				Packet* p = (Packet*)packetBuf;
 
 				switch(p->id) {
 
 				case PACKET_DATA: {
-					uint8_t size = len - sizeof(Packet);
+					uint8_t size = rxDataLen - sizeof(Packet);
 					//printf("recv %d\n", size);
 					if(rxbuf.bytes_free() < size) {
 						printf("drop packet\n");
 					} else {
 						if(p->ackSeq == rcData.seq) {
-							rxbuf.write(buf+sizeof(Packet), size);
+							rxbuf.write(packetBuf+sizeof(Packet), size);
 						} else {
 							printf("discard duplicate seq:%d ackSeq:%d\n", rcData.seq, p->ackSeq);
 						}
@@ -189,8 +202,8 @@ void RemoteControl::handleTick() {
 
 				//xpcc::sleep(100);
 
-				Radio::setFrequency(freq, afcPullIn);
-				Radio::setModemConfig(modemCfg);
+				setFrequency(freq, afcPullIn);
+				setModemConfig(modemCfg);
 
 				setModeRx();
 
@@ -241,5 +254,9 @@ void RemoteControl::handleTick() {
 
 	}
 
+}
+
+void RemoteControl::handleInterrupt() {
+	irqEvent.signal();
 }
 
