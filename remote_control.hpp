@@ -12,16 +12,29 @@
 #include "eeprom/eeprom.hpp"
 #include "pindefs.hpp"
 
-enum PacketType {
+enum class PacketType {
 	PACKET_RC = 100,
 	PACKET_RF_PARAM_SET,
 	PACKET_DATA_FIRST, //first data fragment
-	PACKET_DATA, //data fragment
+	PACKET_TELEMETRY, //data fragment
 	PACKET_DATA_LAST, //last data fragment,
+	RC_ACK
 };
 
+enum class PacketFlags {
+	FLAG_TELEM_PENDING = 1<<0,
+	PACKET_RC = 1<<1,
+	PACKET_RC_ACK = 1<<2,
+	PACKET_TELEMETRY = 1<<3,
+	PACKET_TELEMETRY_ACK = 1<<4,
+};
+
+//
+// Master------[ RCPacket seq=1]-----------------------------------------------------------[TelemACK seq=1]
+//
+// Slave ------------------------[ACK seq=1 FLAG_TELEM_PENDING][Telemetry len=64 seq=1]---
+
 struct Packet {
-	uint8_t id = PACKET_RC;
 	uint8_t seq; //sequence number
 	uint8_t ackSeq; //rx acknowledged seq number
 	int8_t rssi; // local rssi dBm
@@ -29,9 +42,6 @@ struct Packet {
 } __attribute__((packed));
 
 struct RadioCfgPacket : Packet {
-	RadioCfgPacket() {
-		id = PACKET_RF_PARAM_SET;
-	}
 	uint32_t frequency;
 	uint32_t afcPullIn;
 	uint8_t modemCfg;
@@ -41,6 +51,10 @@ struct RadioCfgPacket : Packet {
 
 struct RCPacket : Packet{
 	int16_t channels[16];
+} __attribute__((packed));
+
+struct RCAck {
+	uint8_t seq; //sequence number
 } __attribute__((packed));
 
 class RemoteControl final : public RH_RF22, public BufferedIODevice {
@@ -185,7 +199,18 @@ protected:
 	xpcc::Event irqEvent;
 	xpcc::Event dataEvent;
 
+	void sendRCData();
+	void waitRCack();
 
+	struct {
+		uint8_t lastSeq;
+		uint8_t lastAckSeq;
+	} rcState;
+
+	struct {
+		uint8_t lastSeq;
+		uint8_t lastAckSeq;
+	} telemState;
 
 	uint8_t noiseFloor;
 	uint8_t rssi;

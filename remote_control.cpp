@@ -104,6 +104,14 @@ bool RemoteControl::clearChannel() {
 	return false;
 }
 
+void RemoteControl::sendRCData() {
+
+}
+
+void RemoteControl::waitRCack() {
+
+}
+
 void RemoteControl::handleTick() {
 	//if(!radio_irq::read()) {
 	//	XPCC_LOG_DEBUG << "isr missed\n";
@@ -117,45 +125,43 @@ void RemoteControl::handleTick() {
 		ledRed::reset();
 		if(rxDataLen) {
 			if(rxDataLen >= sizeof(Packet)) {
-				Packet* p = (Packet*)packetBuf;
+				Packet* rx_packet = (Packet*)packetBuf;
 
-				switch(p->id) {
-
-				case PACKET_DATA: {
+				if(headerFlags() & PacketFlags::PACKET_TELEMETRY) {
 					uint8_t size = rxDataLen - sizeof(Packet);
+					uint8_t* payload = packetBuf+sizeof(Packet);
 					//printf("recv %d\n", size);
 					if(rxbuf.bytes_free() < size) {
 						printf("drop packet\n");
 					} else {
-						if(p->ackSeq == rcData.seq) {
-							rxbuf.write(packetBuf+sizeof(Packet), size);
+						if(headerId() == telemState.lastSeq) {
+							rxbuf.write(payload, size);
 						} else {
-							printf("discard duplicate seq:%d ackSeq:%d\n", rcData.seq, p->ackSeq);
+							printf("discard duplicate seq:%d ackSeq:%d\n", rcData.seq, headerId());
 						}
 
+						//TODO: sendTelemACK(seq);
 					}
 				}
-				break;
 
-				}
 
-				if(p->id >= PACKET_RC) {
-					//printf("rx seq %d ackseq %d\n", p->seq, p->ackSeq);
+				if(headerId() == PACKET_RC) { //if valid packet ID
+					//printf("rx seq %d ackseq %d\n", rx_packet->seq, p->ackSeq);
 					//check for lost packets
-					if((uint8_t)(lastSeq+1) != p->seq) {
-						if(p->seq < lastSeq) {
-							_rxBad += 255-lastSeq + p->seq;
+					if((uint8_t)(lastSeq+1) != rx_packet->seq) {
+						if(rx_packet->seq < lastSeq) {
+							_rxBad += 255-lastSeq + rx_packet->seq;
 						} else {
-							_rxBad += p->seq - (lastSeq+1);
+							_rxBad += rx_packet->seq - (lastSeq+1);
 						}
 					}
 
-					remRssi = p->rssi;
-					remNoise = p->noise;
+					remRssi = rx_packet->rssi;
+					remNoise = rx_packet->noise;
 
-					rcData.ackSeq = p->seq; //acknowledge packet
-					lastSeq = p->seq;
-					lastAckSeq = p->ackSeq;
+					rcData.ackSeq = rx_packet->seq; //acknowledge packet on next transmission
+					lastSeq = rx_packet->seq;
+					lastAckSeq = rx_packet->ackSeq;
 
 					if(rcData.seq == lastAckSeq) {
 						//our packet was acknowledged
