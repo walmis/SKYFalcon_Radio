@@ -11,7 +11,9 @@
 #include <xpcc/processing/timeout.hpp>
 #include "eeprom/eeprom.hpp"
 #include "pindefs.hpp"
+#include <ch.h>
 
+#define IRQ_EVENT (1)
 enum class PacketType {
 	PACKET_RC = 100,
 	PACKET_RF_PARAM_SET,
@@ -29,14 +31,21 @@ enum class PacketFlags {
 	PACKET_TELEMETRY_ACK = 1<<4,
 };
 
+enum class EventFlags {
+	EVENT_RX_START = 1<<0,
+	EVENT_RX_COMPLETE = 1<<1,
+	EVENT_TX_COMPLETE = 1<<2
+};
+
+ENUM_CLASS_FLAG(PacketFlags);
+ENUM_CLASS_FLAG(EventFlags);
+
 //
 // Master------[ RCPacket seq=1]-----------------------------------------------------------[TelemACK seq=1]
 //
 // Slave ------------------------[ACK seq=1 FLAG_TELEM_PENDING][Telemetry len=64 seq=1]---
 
 struct Packet {
-	uint8_t seq; //sequence number
-	uint8_t ackSeq; //rx acknowledged seq number
 	int8_t rssi; // local rssi dBm
 	int8_t noise; //local noise dBm
 } __attribute__((packed));
@@ -66,7 +75,8 @@ public:
 		dataLen(0),
 		num_retries(0),
 		sending(0)
-	{}
+	{
+	}
 
 	RCPacket rcData;
 
@@ -187,8 +197,27 @@ public:
     	return mode() == RHModeIdle;
     }
 
+    bool waitPacketSent() {
+    	eventmask_t ev = chEvtWaitAnyTimeout((eventmask_t)EventFlags::EVENT_TX_COMPLETE, MS2ST(100));
+    	if(!ev) {
+    		XPCC_LOG_DEBUG .printf("TX timeout!\n");
+    	}
+    	return ev & EventFlags::EVENT_TX_COMPLETE;
+    }
+
+    void initialize();
+
+    static void* mainTaskEntry(void* ths);
+    static void* irqTaskEntry(void* ths);
+
 protected:
 	friend class FreqConf;
+
+	void mainTask();
+	void irqTask();
+
+	thread_t* mainThread;
+	thread_t* irqThread;
 
 	void handleTxComplete() override;
 	void handleRxComplete() override;
@@ -196,20 +225,24 @@ protected:
 	void handleReset() override;
 	void handleInterrupt() override;
 
-	xpcc::Event irqEvent;
-	xpcc::Event dataEvent;
+	bool sendRCData();
+	bool waitRcACK(systime_t timeout = 0);
+	bool waitTelemACK(systime_t timeout = 0);
 
-	void sendRCData();
-	void waitRCack();
+	bool rxPacket(systime_t timeout = 0);
+	bool rxTelemetryPacket(systime_t timeout = 0);
+	void sendTelemetryPacket();
 
 	struct {
-		uint8_t lastSeq;
-		uint8_t lastAckSeq;
+		uint8_t seq; //sequence number
+		uint8_t lastRxSeq; //last received packet's sequence number
+		uint8_t lastAckSeq; //last acknowledge sequence number
 	} rcState;
 
 	struct {
-		uint8_t lastSeq;
-		uint8_t lastAckSeq;
+		uint8_t seq; //sequence number
+		uint8_t lastRxSeq; //last received packet's sequence number
+		uint8_t lastAckSeq; //last acknowledge sequence number
 	} telemState;
 
 	uint8_t noiseFloor;
@@ -218,14 +251,15 @@ protected:
 	int8_t remRssi;
 	int8_t remNoise;
 
-	void handleInit();
-	void handleTick();
+
 
 	bool sending;
 
-	uint8_t lastSeq;
-	uint8_t lastAckSeq;
 	uint32_t _txBad;
+
+	uint32_t rcPacketsLost;
+
+	uint8_t telemDataLen;
 
 	uint8_t packetBuf[255];
 	uint8_t rxDataLen;

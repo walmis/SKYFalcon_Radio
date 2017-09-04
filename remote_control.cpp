@@ -8,7 +8,7 @@
 #include "remote_control.hpp"
 #include  "Axes.hpp"
 
-void RemoteControl::handleInit() {
+void RemoteControl::initialize() {
 
 	static bool hw_init = false;
 	if(!hw_init) {
@@ -43,6 +43,105 @@ void RemoteControl::handleInit() {
 
 }
 
+void RemoteControl::mainTask() {
+	mainThread = chThdGetSelfX();
+
+	while(1) {
+		//if(!radio_irq::read()) {
+		//	XPCC_LOG_DEBUG << "isr missed\n";
+			//RH_RF22::isr0();
+		//}
+//		if(reset) {
+//			handleInit();
+//		}
+//
+//		if (!transmitting()) {
+//			ledRed::reset();
+//
+//			if (!sending && txPacketTimer.isExpired() && clearChannel()) {
+//
+//				if(configurationChanged) {
+//					RadioCfgPacket p;
+//					p.frequency = getFreq();
+//					p.afcPullIn = getAfcPullIn();
+//					p.fhChannels = getNumFhChannels();
+//					p.modemCfg = getModemCfg();
+//					p.txPower = getTxPower();
+//
+//					send((uint8_t*) (&p), sizeof(RadioCfgPacket));
+//					waitPacketSent();
+//
+//					setModeIdle();
+//
+//					//xpcc::sleep(100);
+//
+//					setFrequency(freq, afcPullIn);
+//					setModemConfig(modemCfg);
+//
+//					setModeRx();
+//
+//					printf("sending radio conf\n");
+//					newRadio//		if(reset) {
+		//			handleInit();
+		//		}
+		//
+		//		if (!transmitting()) {
+		//			ledRed::reset();
+		//
+		//			if (!sending && txPacketTimer.isExpired() && clearChannel()) {
+		//
+		//				if(configurationChanged) {
+		//					RadioCfgPacket p;
+		//					p.frequency = getFreq();
+		//					p.afcPullIn = getAfcPullIn();
+		//					p.fhChannels = getNumFhChannels();
+		//					p.modemCfg = getModemCfg();
+		//					p.txPower = getTxPower();
+		//
+		//					send((uint8_t*) (&p), sizeof(RadioCfgPacket));
+		//					waitPacketSent();
+		//
+		//					setModeIdle();
+		//
+		//					//xpcc::sleep(100);
+		//
+		//					setFrequency(freq, afcPullIn);
+		//					setModemConfig(modemCfg);
+		//
+		//					setModeRx();
+		//
+		//					printf("sending radio conf\n");
+		//					newRadioDataSent = true;
+		//					configurationChanged = false;
+		//				}
+		//
+		//				ledRed::set();
+		//				txPacketTimer.restart(txInterval);
+		//			}
+		//
+		//		}DataSent = true;
+//					configurationChanged = false;
+//				}
+//
+//				ledRed::set();
+//				txPacketTimer.restart(txInterval);
+//			}
+//
+//		}
+
+	}
+}
+
+void RemoteControl::irqTask() {
+	irqThread = chThdGetSelfX();
+
+	while(1) {
+		eventmask_t events = chEvtWaitAnyTimeout(IRQ_EVENT, MS2ST(100));
+
+		this->RH_RF22::handleInterrupt();
+	}
+}
+
 uint8_t RemoteControl::getLinkQuality() {
 	if(xpcc::Clock::now() - radio.getLastPreambleTime() > 250) {
 		return 0;
@@ -55,13 +154,18 @@ uint8_t RemoteControl::getLinkQuality() {
 
 //called from irq thread context
 void RemoteControl::handleTxComplete() {
-	if(numFhChannels)
-		setFHChannel((rcData.seq^0x55) % numFhChannels);
-
-	busy_rx = false;
 	setModeRx();
 
-	dataEvent.signal();
+	chEvtSignal(mainThread, (eventmask_t)EventFlags::EVENT_TX_COMPLETE);
+}
+
+void* RemoteControl::mainTaskEntry(void* ths){
+	static_cast<RemoteControl*>(ths)->mainTask();
+	return 0;
+}
+
+void* RemoteControl::irqTaskEntry(void* ths){
+	static_cast<RemoteControl*>(ths)->irqTask();
 }
 
 //called from irq thread context
@@ -79,13 +183,13 @@ void RemoteControl::handleRxComplete() {
 			rxDataLen = 0;
 		}
 
-		dataEvent.signal();
+		chEvtSignal(mainThread, (eventmask_t)EventFlags::EVENT_RX_COMPLETE);
 	}
 }
 
 //called from irq thread context
 void RemoteControl::handleRxStart() {
-	ledGreen::set();
+	chEvtSignal(mainThread, (eventmask_t)EventFlags::EVENT_RX_START);
 }
 
 //called from irq thread context
@@ -104,165 +208,161 @@ bool RemoteControl::clearChannel() {
 	return false;
 }
 
-void RemoteControl::sendRCData() {
-
-}
-
-void RemoteControl::waitRCack() {
-
-}
-
-void RemoteControl::handleTick() {
-	//if(!radio_irq::read()) {
-	//	XPCC_LOG_DEBUG << "isr missed\n";
-		//RH_RF22::isr0();
-	//}
-	if(reset) {
-		handleInit();
+bool RemoteControl::sendRCData() {
+	RCPacket p;
+	for(int i = 0; i < 16; i++) {
+		p.channels[i] = axes.getChannel(i);
 	}
 
-	if (!transmitting()) {
-		ledRed::reset();
-		if(rxDataLen) {
-			if(rxDataLen >= sizeof(Packet)) {
-				Packet* rx_packet = (Packet*)packetBuf;
+	rcState.seq++;
+	setHeaderId(rcState.seq);
+	setHeaderFlags((char)PacketFlags::PACKET_RC);
 
-				if(headerFlags() & PacketFlags::PACKET_TELEMETRY) {
-					uint8_t size = rxDataLen - sizeof(Packet);
-					uint8_t* payload = packetBuf+sizeof(Packet);
-					//printf("recv %d\n", size);
-					if(rxbuf.bytes_free() < size) {
-						printf("drop packet\n");
-					} else {
-						if(headerId() == telemState.lastSeq) {
-							rxbuf.write(payload, size);
-						} else {
-							printf("discard duplicate seq:%d ackSeq:%d\n", rcData.seq, headerId());
-						}
+	send((uint8_t*)&p, sizeof(RCPacket));
 
-						//TODO: sendTelemACK(seq);
-					}
-				}
+	if(!waitRcACK()) {
+		rcPacketsLost++;
+		return false;
+	}
+	return true;
+}
 
-
-				if(headerId() == PACKET_RC) { //if valid packet ID
-					//printf("rx seq %d ackseq %d\n", rx_packet->seq, p->ackSeq);
-					//check for lost packets
-					if((uint8_t)(lastSeq+1) != rx_packet->seq) {
-						if(rx_packet->seq < lastSeq) {
-							_rxBad += 255-lastSeq + rx_packet->seq;
-						} else {
-							_rxBad += rx_packet->seq - (lastSeq+1);
-						}
-					}
-
-					remRssi = rx_packet->rssi;
-					remNoise = rx_packet->noise;
-
-					rcData.ackSeq = rx_packet->seq; //acknowledge packet on next transmission
-					lastSeq = rx_packet->seq;
-					lastAckSeq = rx_packet->ackSeq;
-
-					if(rcData.seq == lastAckSeq) {
-						//our packet was acknowledged
-						txPacketTimer.restart(0);
-					}
-				}
+bool RemoteControl::waitRcACK(systime_t timeout) {
+	if(rxPacket(timeout)) {
+		if(headerFlags() & PacketFlags::PACKET_RC_ACK) {
+			if(headerId() == rcState.seq) {
+				return true;
 			}
-
-			//XPCC_LOG_DEBUG.dump_buffer(buf, len);
 		}
+	}
+	return false;
+}
 
-		if (!sending && txPacketTimer.isExpired() && clearChannel()) {
+bool RemoteControl::rxPacket(systime_t timeout) {
+	eventmask_t evmask = chEvtWaitAnyTimeout((eventmask_t)EventFlags::EVENT_RX_COMPLETE, timeout);
 
-			bool noAck = false;
-			//sent packet was not acknowledged
-			if(rcData.seq != lastAckSeq) {
-				//if(rcData.seq == lastAckSeq)
-				//if packet was lost, restore previous FH channel
-				if(numFhChannels)
-					setFHChannel(((rcData.seq-1)^0x55) % numFhChannels);
-				noAck = true;
-				_txBad++;
-			}
+	if(evmask & EventFlags::EVENT_RX_COMPLETE) {
+		Packet* rx_packet = (Packet*)packetBuf;
 
-			rcData.seq++;
-			for(int i = 0; i < 16; i++) {
-				rcData.channels[i] = axes.getChannel(i);
-			}
+		remRssi = rx_packet->rssi;
+		remNoise = rx_packet->noise;
+	}
 
-			if(configurationChanged) {
-				RadioCfgPacket p;
-				p.seq = rcData.seq;
-				p.ackSeq = rcData.ackSeq;
-				p.frequency = getFreq();
-				p.afcPullIn = getAfcPullIn();
-				p.fhChannels = getNumFhChannels();
-				p.modemCfg = getModemCfg();
-				p.txPower = getTxPower();
+	return rxDataLen;
+}
 
-				send((uint8_t*) (&p), sizeof(RadioCfgPacket));
-				waitPacketSent();
-
-				setModeIdle();
-
-				//xpcc::sleep(100);
-
-				setFrequency(freq, afcPullIn);
-				setModemConfig(modemCfg);
-
-				setModeRx();
-
-				printf("sending radio conf\n");
-				newRadioDataSent = true;
-				configurationChanged = false;
-			} else {
-				if(noAck && dataLen) {
-					//XPCC_LOG_DEBUG << "retry\n";
-					//update rc data, and retransmit payload
-					memcpy(packetBuf, (void*)&rcData, sizeof(RCPacket));
-					send(packetBuf, dataLen);
-					num_retries++;
-					if(num_retries > max_retries) {
-						printf("Max retries reached, drop packet\n");
-						num_retries = 0;
-						dataLen = 0;
-					}
-
+bool RemoteControl::rxTelemetryPacket(systime_t timeout) {
+	//wait for packet
+	if(rxPacket(timeout)) {
+		Packet* rx_packet = (Packet*)packetBuf;
+		if(rx_packet) {
+			if(headerFlags() & PacketFlags::PACKET_TELEMETRY) {
+				uint8_t size = rxDataLen - sizeof(Packet);
+				uint8_t* payload = packetBuf+sizeof(Packet);
+				//printf("recv %d\n", size);
+				if(rxbuf.bytes_free() < size) {
+					printf("drop packet\n");
 				} else {
-					size_t avail = txbuf.bytes_used();
-					if(avail) {
-						size_t space = sizeof(packetBuf) - sizeof(RCPacket);
-						uint8_t* ptr = packetBuf + sizeof(RCPacket);
-						//copy pending rc packet to tx buffer
-						memcpy(packetBuf, (void*)&rcData, sizeof(RCPacket));
-						while(space && avail) {
-							*ptr++ = txbuf.read();
-							space--;
-							avail--;
-						}
-						dataLen = ptr - packetBuf;
-
-						printf("send %d\n", dataLen-sizeof(RCPacket));
-						send(packetBuf, dataLen);
-
+					if(headerId() == telemState.lastRxSeq) {
+						rxbuf.write(payload, size);
 					} else {
-						dataLen = 0;
-
-						send((uint8_t*) (&rcData), sizeof(rcData));
+						printf("discard duplicate seq:%d ackSeq:%d\n", telemState.lastRxSeq, headerId());
 					}
 
+					telemState.lastRxSeq = headerId();
+
+					//TODO: sendTelemACK(seq);
+					return true;
 				}
 			}
-			ledRed::set();
-			txPacketTimer.restart(txInterval);
+		}
+	}
+	return false;
+}
+
+//void RemoteControl::updatePacketCounts(Packet* p) {
+//	if(headerId() == PACKET_RC) { //if valid packet ID
+//		//printf("rx seq %d ackseq %d\n", rx_packet->seq, p->ackSeq);
+//		//check for lost packets
+//		if((uint8_t)(lastSeq+1) != rx_packet->seq) {
+//			if(rx_packet->seq < lastSeq) {
+//				_rxBad += 255-lastSeq + rx_packet->seq;
+//			} else {
+//				_rxBad += rx_packet->seq - (lastSeq+1);
+//			}
+//		}
+//
+//		remRssi = p->rssi;
+//		remNoise = p->noise;
+//	}
+//}
+bool RemoteControl::waitTelemACK(systime_t timeout) {
+	if(rxPacket(timeout)) {
+		Packet* rx_packet = (Packet*)packetBuf;
+		if(headerFlags() & PacketFlags::PACKET_TELEMETRY_ACK) {
+			if(headerId() == telemState.seq) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+void RemoteControl::sendTelemetryPacket() {
+	//previous packet still loaded, meaning no ack was received
+	//retransmit
+	if(telemDataLen) {
+		//XPCC_LOG_DEBUG << "retry\n";
+		//update rc data, and retransmit payload
+		setHeaderId(telemState.seq);
+		setHeaderFlags((uint8_t)PacketFlags::PACKET_TELEMETRY);
+
+		send(packetBuf, telemDataLen);
+
+		num_retries++;
+		if(num_retries > max_retries) {
+			printf("[telemetry] Max retries reached, drop packet\n");
+			num_retries = 0;
+			telemDataLen = 0;
 		}
 
+	} else {
+		size_t avail = txbuf.bytes_used();
+		if(avail) {
+			size_t space = sizeof(packetBuf) - sizeof(Packet);
+			uint8_t* ptr = packetBuf + sizeof(Packet);
+
+			while(space && avail) {
+				*ptr++ = txbuf.read();
+				space--;
+				avail--;
+			}
+
+			telemDataLen = ptr - packetBuf;
+
+			printf("[telemetry] send len:%d\n", telemDataLen-sizeof(Packet));
+
+			setHeaderFlags((uint8_t)PacketFlags::PACKET_TELEMETRY);
+			setHeaderId(telemState.seq++);
+
+			send(packetBuf, telemDataLen);
+
+		} else {
+			telemDataLen = 0;
+			return; //nothing to send, return
+		}
+	}
+
+	waitPacketSent();
+
+	if(waitTelemACK()) {
+		telemDataLen = 0;
 	}
 
 }
 
+//called from IRQ context
 void RemoteControl::handleInterrupt() {
-	irqEvent.signal();
+	chEvtSignalI(irqThread, IRQ_EVENT);
 }
 
