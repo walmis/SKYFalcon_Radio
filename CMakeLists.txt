@@ -60,3 +60,9 @@ add_custom_command(TARGET ${PROJECT_NAME}  POST_BUILD
                         ARGS    -v ffff -p 12c9 -a "${PROJECT_NAME}.dfu"
                         COMMENT "Generating DFU Image"
                         VERBATIM)
+                        
+add_custom_target(
+   upload
+   COMMAND scp "${PROJECT_NAME}.dfu" walmis@pi:~
+   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
