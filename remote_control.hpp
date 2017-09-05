@@ -34,7 +34,8 @@ enum class PacketFlags {
 enum class EventFlags {
 	EVENT_RX_START = 1<<0,
 	EVENT_RX_COMPLETE = 1<<1,
-	EVENT_TX_COMPLETE = 1<<2
+	EVENT_TX_COMPLETE = 1<<2,
+	EVENT_RADIO_RESET = 1<<8
 };
 
 ENUM_CLASS_FLAG(PacketFlags);
