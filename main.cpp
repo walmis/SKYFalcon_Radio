@@ -12,7 +12,7 @@
 #include "remote_control.hpp"
 #include <ch.h>
 
-//#define SWD
+#define SWD
 
 using namespace xpcc;
 using namespace lpc11;
@@ -44,14 +44,15 @@ extern "C" void HardFault_Handler(void) //__attribute__((naked))
   } else {
 	  asm("mrs r0, psp");
   }
-  asm("mov sp, r0");
-  asm("bkpt");
+  //asm("mov sp, r0");
+  //asm("bkpt");
 
 
 //				  ITE EQ;  \
 //				  MRSEQ R0, MSP;  \
 //				  MRSNE R0, PSP; \
 //		       	  B Hard_Fault_Handler;");
+  asm("B Hard_Fault_Handler");
 	//__get
 }
 
@@ -69,7 +70,7 @@ void Hard_Fault_Handler(uint32_t stack[]) {
 	IODeviceWrapper<Uart1> d;
 	IOStream w(d);
 //////
-//	w.printf("Hard Fault\n");
+	w.printf("Hard Fault\n");
 ////
 	w.printf("r0  = 0x%08x\n", stack[r0]);
 	w.printf("r1  = 0x%08x\n", stack[r1]);
@@ -271,7 +272,7 @@ void main_thread(void*) {
 	usb.addInterfaceHandler(dfu);
 
 
-#ifndef SWD
+#if 0
 	bt_rst::setOutput(0);
 	bt_key::setOutput(0);
 	bluetooth_init();
@@ -308,19 +309,18 @@ void main_thread(void*) {
 	//LPC_PMU->GPREG3 = 0; //tell bootloader: boot OK
 
 	while(1) {
-		chThdSleep(MS2ST(1000));
+		chThdSleep(MS2ST(100));
 
 		XPCC_LOG_DEBUG.printf("alive\n");
-	}
-}
 
-THD_WORKING_AREA(wa_test_thread, 128);
-void test(void*) {
-	while(1) {
-		chThdSleep(MS2ST(1000));
+		if(boot_detach) {
+			LPC_PMU->GPREG3 = 255;
+			NVIC_SystemReset();
+		}
 
 	}
 }
+
 
 THD_TABLE_BEGIN
   THD_TABLE_ENTRY(wa_main_thread, "main", main_thread, NULL)
@@ -336,12 +336,12 @@ int main() {
 
 	while(1) {
 
-		if(boot_detach) {
-			LPC_PMU->GPREG3 = 255;
+		lpc11u::Watchdog::feed();
+
+		int16_t c = uart1.read();
+		if(c == 'r') {
 			NVIC_SystemReset();
 		}
-
-		lpc11u::Watchdog::feed();
 
 	}
 }

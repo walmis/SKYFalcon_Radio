@@ -139,7 +139,7 @@ void RemoteControl::irqTask() {
 	while(1) {
 		eventmask_t events = chEvtWaitAnyTimeout(IRQ_EVENT, MS2ST(100));
 
-		this->RH_RF22::handleInterrupt();
+		//this->RH_RF22::handleInterrupt();
 	}
 }
 
