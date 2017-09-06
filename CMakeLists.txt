@@ -62,7 +62,10 @@ add_custom_command(TARGET ${PROJECT_NAME}  POST_BUILD
                         VERBATIM)
                         
 add_custom_target(
-   upload
-   COMMAND scp "${PROJECT_NAME}.dfu" walmis@pi:~
+   upload_remote
+   COMMAND scp "${PROJECT_NAME}.dfu" pi:~
+   COMMAND ssh pi "dfu-util -E 1 -R -D ${PROJECT_NAME}.dfu"
+   
    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
+add_dependencies(upload_remote ${PROJECT_NAME})
