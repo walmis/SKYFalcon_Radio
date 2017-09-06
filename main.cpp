@@ -11,7 +11,8 @@
 #include "pindefs.hpp"
 #include "remote_control.hpp"
 #include <ch.h>
-#define SWD 1
+
+//#define SWD
 
 using namespace xpcc;
 using namespace lpc11;
@@ -307,7 +308,7 @@ void main_thread(void*) {
 	//LPC_PMU->GPREG3 = 0; //tell bootloader: boot OK
 
 	while(1) {
-		chThdSleep(MS2ST(100));
+		chThdSleep(MS2ST(1000));
 
 		XPCC_LOG_DEBUG.printf("alive\n");
 	}
@@ -323,7 +324,8 @@ void test(void*) {
 
 THD_TABLE_BEGIN
   THD_TABLE_ENTRY(wa_main_thread, "main", main_thread, NULL)
-  THD_TABLE_ENTRY(wa_test_thread, "hello", test, NULL)
+  THD_TABLE_ENTRY(radio.wa_main_thread, "radio_main", radio.mainTaskEntry, (void*)&radio)
+  THD_TABLE_ENTRY(radio.wa_irq_thread, "radio_irq", radio.irqTaskEntry, (void*)&radio)
 THD_TABLE_END
 
 extern "C" void port_timer_init();

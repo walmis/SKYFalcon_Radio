@@ -69,8 +69,7 @@ struct RCAck {
 
 class RemoteControl final : public RH_RF22, public BufferedIODevice {
 public:
-	RemoteControl() : RH_RF22((radio_sel::port<<5)|radio_sel::pin,
-		(radio_irq::port<<5)|radio_irq::pin),
+	RemoteControl() : RH_RF22(radio_sel::id, radio_irq::id),
 		BufferedIODevice(txbuf, txbuf),
 		txPacketTimer(20),
 		dataLen(0),
@@ -208,8 +207,11 @@ public:
 
     void initialize();
 
-    static void* mainTaskEntry(void* ths);
-    static void* irqTaskEntry(void* ths);
+    static void mainTaskEntry(void* ths);
+    static void irqTaskEntry(void* ths);
+
+    THD_WORKING_AREA(wa_main_thread, 256);
+    THD_WORKING_AREA(wa_irq_thread, 256);
 
 protected:
 	friend class FreqConf;

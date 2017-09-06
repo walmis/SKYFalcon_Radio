@@ -34,22 +34,25 @@ int putchar(int c) {
 }
 
 void delay(uint32_t millis) {
-	//xpcc::delay_ms(millis);
+	xpcc::sleep(millis);
 }
 
 void rh_yield() {
-	//xpcc::TickerTask::yield();
+	xpcc::yield();
 }
 
+xpcc::RMutex mutex;
 
 void rh_atomic_block_start() {
-	xpcc::GpioInt::disableInterrupts();
+	//xpcc::GpioInt::disableInterrupts();
 	//__disable_irq();
+	mutex.lock();
 }
 
 void rh_atomic_block_end() {
-	xpcc::GpioInt::enableInterrupts();
+	//xpcc::GpioInt::enableInterrupts();
 	//__enable_irq();
+	mutex.unlock();
 }
 
 uint32_t RH::millis() {
@@ -82,7 +85,9 @@ void attachInterrupt(uint8_t pin, void (*fn)(void), int mode) {
 		edge = (xpcc::IntEdge)(xpcc::IntEdge::RISING_EDGE | xpcc::IntEdge::FALLING_EDGE);
 	}
 
-	xpcc::GpioInt::attach(pin>>5, pin&0x1F,	fn, edge);
+	auto i = xpcc::GpioInt::attach(pin>>5, pin&0x1F,	fn, edge);
+	i.leak();
+
 }
 
 

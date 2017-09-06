@@ -12,7 +12,7 @@ void RemoteControl::initialize() {
 
 	static bool hw_init = false;
 	if(!hw_init) {
-		xpcc::TickerTask::sleep(40);
+		xpcc::sleep(40);
 		if(!this->RH_RF22::HWinit()) {
 			panic("radio HW init fail");
 		}
@@ -47,6 +47,7 @@ void RemoteControl::mainTask() {
 	mainThread = chThdGetSelfX();
 
 	while(1) {
+		chThdSleep(MS2ST(100));
 		//if(!radio_irq::read()) {
 		//	XPCC_LOG_DEBUG << "isr missed\n";
 			//RH_RF22::isr0();
@@ -159,12 +160,11 @@ void RemoteControl::handleTxComplete() {
 	chEvtSignal(mainThread, (eventmask_t)EventFlags::EVENT_TX_COMPLETE);
 }
 
-void* RemoteControl::mainTaskEntry(void* ths){
+void RemoteControl::mainTaskEntry(void* ths){
 	static_cast<RemoteControl*>(ths)->mainTask();
-	return 0;
 }
 
-void* RemoteControl::irqTaskEntry(void* ths){
+void RemoteControl::irqTaskEntry(void* ths){
 	static_cast<RemoteControl*>(ths)->irqTask();
 }
 
