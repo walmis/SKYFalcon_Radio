@@ -54,6 +54,12 @@ set(CMAKE_INCLUDE_SYSTEM_FLAG_C "-I")
 add_subdirectory(chibi)
 
 add_custom_command(TARGET ${PROJECT_NAME}  POST_BUILD
+                        COMMAND python
+                        ARGS "./siggen.py"
+                        COMMENT "Generating Signature"
+                        VERBATIM)
+
+add_custom_command(TARGET ${PROJECT_NAME}  POST_BUILD
                         COMMAND cp
                         ARGS "${PROJECT_NAME}.bin" "${PROJECT_NAME}.dfu"
                         COMMAND dfu-suffix
@@ -64,7 +70,7 @@ add_custom_command(TARGET ${PROJECT_NAME}  POST_BUILD
 add_custom_target(
    upload_remote
    COMMAND scp "${PROJECT_NAME}.dfu" pi:~
-   COMMAND ssh pi "dfu-util -E 1 -R -D ${PROJECT_NAME}.dfu"
+   COMMAND ssh pi "dfu-util -E 2 -R -D ${PROJECT_NAME}.dfu"
    
    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )

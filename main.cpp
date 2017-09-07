@@ -30,6 +30,8 @@ StaticIOBuffer<256> txbuf;
 StaticIOBuffer<64> rxbuf;
 xpcc::lpc11::BufferedUart uart1(115200, txbuf, rxbuf);
 
+__attribute__((section(".fwversion"),used)) const uint32_t fw[5] = {0};
+
 volatile bool boot_detach;
 
 enum { r0, r1, r2, r3, r12, lr, pc, psr};
@@ -59,6 +61,8 @@ extern "C" void HardFault_Handler(void) //__attribute__((naked))
 NullIODevice null;
 xpcc::log::Logger xpcc::log::debug(uart1);
 
+extern "C"
+void Hard_Fault_Handler(uint32_t stack[]) __attribute((used));
 extern "C"
 void Hard_Fault_Handler(uint32_t stack[]) {
 
@@ -309,7 +313,7 @@ void main_thread(void*) {
 	//LPC_PMU->GPREG3 = 0; //tell bootloader: boot OK
 
 	while(1) {
-		chThdSleep(MS2ST(100));
+		chThdSleep(MS2ST(1000));
 
 		XPCC_LOG_DEBUG.printf("alive\n");
 
