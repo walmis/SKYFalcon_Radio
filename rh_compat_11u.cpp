@@ -58,6 +58,9 @@ void rh_atomic_block_end() {
 uint32_t RH::millis() {
 	return xpcc::Clock::now().getTime();
 }
+uint32_t RH::micros() {
+	return chVTGetSystemTimeX();
+}
 
 void pinMode(uint8_t pin, WiringPinMode mode) {
 	uint8_t port = pin>>5;
