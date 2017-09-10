@@ -31,6 +31,7 @@ set(SOURCES
     ./SwUart.cpp
     ./eeprom/eeprom.cpp
     ./lpc11xx/cmsis/system_LPC11xx.c
+    ./dbg_uart.c
 )
 
 execute_process(COMMAND

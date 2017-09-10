@@ -210,8 +210,8 @@ public:
     static void mainTaskEntry(void* ths);
     static void irqTaskEntry(void* ths);
 
-    THD_WORKING_AREA(wa_main_thread, 256);
-    THD_WORKING_AREA(wa_irq_thread, 256);
+    THD_WORKING_AREA(wa_main_thread, 512);
+    THD_WORKING_AREA(wa_irq_thread, 512);
 
 protected:
 	friend class FreqConf;

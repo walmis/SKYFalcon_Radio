@@ -12,7 +12,7 @@
 #include "remote_control.hpp"
 #include <ch.h>
 
-#define SWD
+//#define SWD
 
 using namespace xpcc;
 using namespace lpc11;
@@ -61,34 +61,6 @@ extern "C" void HardFault_Handler(void) //__attribute__((naked))
 NullIODevice null;
 xpcc::log::Logger xpcc::log::debug(uart1);
 
-extern "C"
-void Hard_Fault_Handler(uint32_t stack[]) __attribute((used));
-extern "C"
-void Hard_Fault_Handler(uint32_t stack[]) {
-
-	//register uint32_t* stack = (uint32_t*)__get_MSP();
-
-//	ledGreen::set(0);
-//	ledRed::setOutput(0);
-	Uart1::init(115200);
-	IODeviceWrapper<Uart1> d;
-	IOStream w(d);
-//////
-	w.printf("Hard Fault\n");
-////
-	w.printf("r0  = 0x%08x\n", stack[r0]);
-	w.printf("r1  = 0x%08x\n", stack[r1]);
-	w.printf("r2  = 0x%08x\n", stack[r2]);
-	w.printf("r3  = 0x%08x\n", stack[r3]);
-	w.printf("r12 = 0x%08x\n", stack[r12]);
-	w.printf("lr  = 0x%08x\n", stack[lr]);
-	w.printf("pc  = 0x%08x\n", stack[pc]);
-	w.printf("psr = 0x%08x\n", stack[psr]);
-//
-//	LPC_PMU->GPREG3 |= 1;
-//	NVIC_SystemReset();
-	while(1) {}
-}
 
 
 void idle() {
@@ -334,6 +306,11 @@ THD_TABLE_END
 
 extern "C" void port_timer_init();
 int main() {
+
+	LPC_WWDT->WARNINT = 1023;
+	LPC_WWDT->MOD |= WDINT;
+	NVIC_EnableIRQ(WDT_IRQn);
+
 	usbclk_init();
 	port_timer_init();
 	chSysInit();

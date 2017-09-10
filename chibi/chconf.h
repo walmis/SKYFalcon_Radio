@@ -255,11 +255,16 @@
 #define CH_CFG_IDLE_LEAVE_HOOK() {                                          \
 }
 
+#if !defined(_FROM_ASM_)
+#include "../dbg_uart.h"
+#endif
+
 /**
  * @brief   System halt hook.
  */
 #if !defined(CH_CFG_SYSTEM_HALT_HOOK) || defined(__DOXYGEN__)
-#define CH_CFG_SYSTEM_HALT_HOOK(reason) {                                   \
+#define CH_CFG_SYSTEM_HALT_HOOK(reason) {							\
+		uart_print("HALT:"); uart_print(reason); uart_print("\n");			\
 }
 #endif
 

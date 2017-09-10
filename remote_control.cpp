@@ -23,7 +23,7 @@ void RemoteControl::initialize() {
 	if(!this->RH_RF22::init()) {
 		panic("radio init fail");
 	}
-
+	printf("init\n");
 
 	eeprom.get(&EEData::rfFrequency, freq);
 	eeprom.get(&EEData::afcPullIn, afcPullIn);
@@ -45,6 +45,9 @@ void RemoteControl::initialize() {
 
 void RemoteControl::mainTask() {
 	mainThread = chThdGetSelfX();
+
+	printf("thread started\n");
+	initialize();
 
 	while(1) {
 		chThdSleep(MS2ST(100));
