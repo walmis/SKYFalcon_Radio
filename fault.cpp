@@ -7,6 +7,32 @@
 
 
 #include "dbg_uart.h"
+#include <stdint.h>
+#include <LPC11Uxx.h>
+
+enum { r0, r1, r2, r3, r12, lr, pc, psr};
+
+extern "C" void HardFault_Handler(void) __attribute__((naked));
+extern "C" void HardFault_Handler(void) //__attribute__((naked))
+{
+  //asm volatile("  TST LR, #4; ");
+  register long lr asm("lr");
+  if(lr != 0xFFFFFFF1U) {
+	  asm("mrs r0, msp");
+  } else {
+	  asm("mrs r0, psp");
+  }
+  //asm("mov sp, r0");
+  //asm("bkpt");
+
+
+//				  ITE EQ;  \
+//				  MRSEQ R0, MSP;  \
+//				  MRSNE R0, PSP; \
+//		       	  B Hard_Fault_Handler;");
+  asm("B Hard_Fault_Handler");
+	//__get
+}
 
 extern "C"
 void Hard_Fault_Handler(uint32_t stack[]) __attribute((used));
@@ -18,14 +44,14 @@ void Hard_Fault_Handler(uint32_t stack[]) {
 //////
 	uart_print("Hard Fault\n");
 ////
-//	uart_print("r0  = 0x") stack[r0]);
-//	uart_print("r1  = 0x") stack[r1]);
-//	uart_print("r2  = 0x") stack[r2]);
-//	uart_print("r3  = 0x") stack[r3]);
-//	uart_print("r12 = 0x") stack[r12]);
-//	uart_print("lr  = 0x") stack[lr]);
-//	uart_print("pc  = 0x") stack[pc]);
-//	uart_print("psr = 0x") stack[psr]);
+	uart_print("\tr0  = 0x"); uart_put_hex( stack[r0]); uart_print("\n");
+	uart_print("\tr1  = 0x"); uart_put_hex( stack[r1]); uart_print("\n");
+	uart_print("\tr2  = 0x"); uart_put_hex( stack[r2]); uart_print("\n");
+	uart_print("\tr3  = 0x"); uart_put_hex( stack[r3]); uart_print("\n");
+	uart_print("\tr12 = 0x"); uart_put_hex( stack[r12]); uart_print("\n");
+	uart_print("\tlr  = 0x"); uart_put_hex( stack[lr]); uart_print("\n");
+	uart_print("\tpc  = 0x"); uart_put_hex( stack[pc]); uart_print("\n");
+	uart_print("\tpsr = 0x"); uart_put_hex( stack[psr]); uart_print("\n");
 //
 //	LPC_PMU->GPREG3 |= 1;
 //	NVIC_SystemReset();
@@ -36,10 +62,10 @@ void Hard_Fault_Handler(uint32_t stack[]) {
 extern "C" __attribute__((naked))
 void WDT_IRQHandler() {
 	  register long lr asm("lr");
-	  if(lr & 4) {
-		  asm("mrs r0, msp");
-	  } else {
+	  if(lr != 0xFFFFFFF1U) {
 		  asm("mrs r0, psp");
+	  } else {
+		  asm("mrs r0, msp");
 	  }
 	  //asm("mov sp, r0");
 	  //asm("bkpt");
@@ -52,23 +78,20 @@ void WDT_IRQHandler() {
 	  asm("B WDT_Handler");
 }
 
-extern "C"
-void WDT_Handler(uint32_t stack[]) {
-	Uart1::init(115200);
-	IODeviceWrapper<Uart1> d;
-	IOStream w(d);
-
-	w.printf("WDT\n");
+extern "C" __attribute((used))
+void WDT_Handler(uint32_t stack[])  {
+	LPC_WWDT->MOD |= (1<<3);
+	uart_print("WDT Event\n");
 ////
-	w.printf("r0  = 0x%08x\n", stack[r0]);
-	w.printf("r1  = 0x%08x\n", stack[r1]);
-	w.printf("r2  = 0x%08x\n", stack[r2]);
-	w.printf("r3  = 0x%08x\n", stack[r3]);
-	w.printf("r12 = 0x%08x\n", stack[r12]);
-	w.printf("lr  = 0x%08x\n", stack[lr]);
-	w.printf("pc  = 0x%08x\n", stack[pc]);
-	w.printf("psr = 0x%08x\n", stack[psr]);
+	uart_print("\tr0  = 0x"); uart_put_hex( stack[r0]); uart_print("\n");
+	uart_print("\tr1  = 0x"); uart_put_hex( stack[r1]); uart_print("\n");
+	uart_print("\tr2  = 0x"); uart_put_hex( stack[r2]); uart_print("\n");
+	uart_print("\tr3  = 0x"); uart_put_hex( stack[r3]); uart_print("\n");
+	uart_print("\tr12 = 0x"); uart_put_hex( stack[r12]); uart_print("\n");
+	uart_print("\tlr  = 0x"); uart_put_hex( stack[lr]); uart_print("\n");
+	uart_print("\tpc  = 0x"); uart_put_hex( stack[pc]); uart_print("\n");
+	uart_print("\tpsr = 0x"); uart_put_hex( stack[psr]); uart_print("\n");
 
-	while(1);
+	//while(1);
 }
 

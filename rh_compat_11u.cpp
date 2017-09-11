@@ -65,6 +65,7 @@ uint32_t RH::micros() {
 void pinMode(uint8_t pin, WiringPinMode mode) {
 	uint8_t port = pin>>5;
 	uint8_t p = pin&0x1F;
+	//printf("pinMode %d %d -> %d\n", port, pin, mode);
 
 	switch(mode) {
 	case WiringPinMode::OUTPUT:
@@ -97,6 +98,7 @@ void attachInterrupt(uint8_t pin, void (*fn)(void), int mode) {
 void digitalWrite(uint8_t pin, uint8_t val) {
 	uint8_t p = pin&0x1F;
 	uint8_t port = pin>>5;
+	//printf("DW %d %d -> %d\n", port, p, val);
 	if(port == 0) {
 		LPC_GPIO->W0[p] = val;
 	} else if(port == 1) {

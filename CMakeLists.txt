@@ -32,6 +32,7 @@ set(SOURCES
     ./eeprom/eeprom.cpp
     ./lpc11xx/cmsis/system_LPC11xx.c
     ./dbg_uart.c
+    ./fault.cpp
 )
 
 execute_process(COMMAND

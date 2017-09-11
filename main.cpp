@@ -34,30 +34,6 @@ __attribute__((section(".fwversion"),used)) const uint32_t fw[5] = {0};
 
 volatile bool boot_detach;
 
-enum { r0, r1, r2, r3, r12, lr, pc, psr};
-
-extern "C" void HardFault_Handler(void) __attribute__((naked));
-extern "C" void HardFault_Handler(void) //__attribute__((naked))
-{
-  //asm volatile("  TST LR, #4; ");
-  register long lr asm("lr");
-  if(lr & 4) {
-	  asm("mrs r0, msp");
-  } else {
-	  asm("mrs r0, psp");
-  }
-  //asm("mov sp, r0");
-  //asm("bkpt");
-
-
-//				  ITE EQ;  \
-//				  MRSEQ R0, MSP;  \
-//				  MRSNE R0, PSP; \
-//		       	  B Hard_Fault_Handler;");
-  asm("B Hard_Fault_Handler");
-	//__get
-}
-
 NullIODevice null;
 xpcc::log::Logger xpcc::log::debug(uart1);
 
@@ -158,7 +134,7 @@ void test_osc() {
 }
 
 void panic(const char* s) {
-	XPCC_LOG_DEBUG << s << endl;
+	uart_print("PANIC:"); uart_print(s); uart_print("\n");
 	while(1);
 }
 
@@ -242,12 +218,6 @@ void main_thread(void*) {
 	XPCC_LOG_DEBUG .printf("Starting clock:%d\n", SystemCoreClock);
 	XPCC_LOG_DEBUG .printf("Free heap:%d\n", (int)(&__heap_end__)-(int)(&__heap_base__));
 
-	ledRed::setOutput(true);
-	ledGreen::setOutput(true);
-
-	usb.addInterfaceHandler(dfu);
-
-
 #if 0
 	bt_rst::setOutput(0);
 	bt_key::setOutput(0);
@@ -265,22 +235,10 @@ void main_thread(void*) {
 //
 //	xpcc::Random::seed();
 //
-#ifndef SWD
-	radioSpiMaster::configurePins(radioSpiMaster::MappingSck::PIO0_10, false);
-	radioSpiMaster::initialize(radioSpiMaster::Mode::MODE_0, 8000000);
-#endif
-
 	usb.connect();
 	usbConnect::setOutput(true);
 
-	eeprom.initialize();
 
-	NVIC_SetPriority(UART_IRQn, 3);
-	NVIC_SetPriority(USB_IRQn, 3);
-
-	NVIC_SetPriority(FLEX_INT0_IRQn, 2); //Radio ISR
-	NVIC_SetPriority(TIMER_16_1_IRQn, 2); //PPM decoder
-	NVIC_SetPriority(TIMER_32_0_IRQn, 0); //SW uart has max priority
 
 	//LPC_PMU->GPREG3 = 0; //tell bootloader: boot OK
 
@@ -308,8 +266,28 @@ extern "C" void port_timer_init();
 int main() {
 
 	LPC_WWDT->WARNINT = 1023;
-	LPC_WWDT->MOD |= WDINT;
+	lpc11u::Watchdog::feed();
+
 	NVIC_EnableIRQ(WDT_IRQn);
+
+	ledRed::setOutput(true);
+	ledGreen::setOutput(true);
+
+	usb.addInterfaceHandler(dfu);
+
+	eeprom.initialize();
+
+	NVIC_SetPriority(UART_IRQn, 3);
+	NVIC_SetPriority(USB_IRQn, 3);
+
+	NVIC_SetPriority(FLEX_INT0_IRQn, 2); //Radio ISR
+	NVIC_SetPriority(TIMER_16_1_IRQn, 2); //PPM decoder
+	NVIC_SetPriority(TIMER_32_0_IRQn, 0); //SW uart has max priority
+
+#ifndef SWD
+	radioSpiMaster::configurePins(radioSpiMaster::MappingSck::PIO0_10, false);
+	radioSpiMaster::initialize(radioSpiMaster::Mode::MODE_0, 100000);
+#endif
 
 	usbclk_init();
 	port_timer_init();

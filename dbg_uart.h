@@ -8,7 +8,7 @@
 #ifndef DBG_UART_H_
 #define DBG_UART_H_
 
-#ifdef _cplusplus
+#ifdef __cplusplus
 extern "C" {
 #endif
 
@@ -19,7 +19,7 @@ void uart_put_dec(int i);
 void uart_print(const char* str);
 void uart_print_buf(const char* buf, int len);
 
-#ifdef _cplusplus
+#ifdef __cplusplus
 }
 #endif
 

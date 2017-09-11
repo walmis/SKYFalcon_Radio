@@ -1,10 +1,13 @@
 #include <xpcc/processing/rtos_abstraction.hpp>
 #include <ch.h>
+#include "../../dbg_uart.h"
 
 namespace xpcc {
-  IRQWrapper::IRQWrapper() {
+  IRQWrapper::IRQWrapper(void *lr) {
     CH_IRQ_PROLOGUE();
-    data = (void*)_saved_lr;
+    //uart_print("lr "); uart_put_hex((int)lr);
+    //uart_print("\n");
+    data = (void*)lr;
   }
   //epilogue
   IRQWrapper::~IRQWrapper() {
