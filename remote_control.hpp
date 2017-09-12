@@ -78,6 +78,26 @@ public:
 	{
 	}
 
+	class RxPacket {
+	public:
+		RxPacket(uint8_t* ptr_data, uint8_t* ptr_len) :
+		ptr_data(ptr_data), ptr_len(ptr_len)
+		{}
+
+		//indicates that the buffer is no longer used
+		~RxPacket() { if(ptr_len) *ptr_len = 0; }
+
+		uint8_t* payload() { return ptr_data; }
+		uint8_t len() { if(ptr_len) return *ptr_len; else return 0; }
+
+		operator bool() { return ptr_data; }
+
+	private:
+		uint8_t* ptr_data;
+		uint8_t* ptr_len;
+	};
+
+
 	RCPacket rcData;
 
 	uint8_t getLinkQuality();
@@ -197,13 +217,8 @@ public:
     	return mode() == RHModeIdle;
     }
 
-    bool waitPacketSent() {
-    	eventmask_t ev = chEvtWaitAnyTimeout((eventmask_t)EventFlags::EVENT_TX_COMPLETE, MS2ST(100));
-    	if(!ev) {
-    		XPCC_LOG_DEBUG .printf("TX timeout!\n");
-    	}
-    	return ev & EventFlags::EVENT_TX_COMPLETE;
-    }
+    bool waitPacketSent() override;
+    uint32_t lastTransmitTime() { return _lastTransmitTime; }
 
     void initialize();
 
@@ -232,9 +247,13 @@ protected:
 	bool waitRcACK(systime_t timeout = 0);
 	bool waitTelemACK(systime_t timeout = 0);
 
-	bool rxPacket(systime_t timeout = 0);
+	//wait for Rx start (preamble)
+	bool waitRxStart(systime_t timeout);
+	RxPacket waitRxPacket(systime_t timeout = 0);
 	bool rxTelemetryPacket(systime_t timeout = 0);
 	void sendTelemetryPacket();
+
+	void clearRxPacket() { rxDataLen = 0; }
 
 	struct {
 		uint8_t seq; //sequence number
@@ -251,8 +270,8 @@ protected:
 	uint8_t noiseFloor;
 	uint8_t rssi;
 
-	int8_t remRssi;
-	int8_t remNoise;
+	int8_t remRssi; //remote rssi dBm
+	int8_t remNoise; //remote noise dBm
 
 
 
@@ -265,8 +284,10 @@ protected:
 	uint8_t telemDataLen;
 
 	uint8_t packetBuf[255];
-	uint8_t rxDataLen;
-	uint8_t dataLen;
+	uint8_t rxDataLen = 0;
+	uint8_t dataLen = 0;
+
+	uint32_t _lastTransmitTime;
 
 	xpcc::Timeout<> txPacketTimer;
 

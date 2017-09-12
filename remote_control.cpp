@@ -8,6 +8,20 @@
 #include "remote_control.hpp"
 #include  "Axes.hpp"
 
+class StopWatch {
+public:
+	StopWatch() {
+		time = chVTGetSystemTimeX();
+	}
+	void start() {
+		time = chVTGetSystemTimeX();
+	}
+	uint32_t stop() {
+		return chVTGetSystemTimeX() - time;
+	}
+	uint32_t time;
+};
+
 void RemoteControl::initialize() {
 
 	static bool hw_init = false;
@@ -31,7 +45,7 @@ void RemoteControl::initialize() {
 	eeprom.get(&EEData::txInterval, txInterval);
 	eeprom.get(&EEData::fhChannels, numFhChannels);
 
-	XPCC_LOG_DEBUG .printf("init radio f:%d txpw:%d fh:%d\n", freq, txPower, numFhChannels );
+	XPCC_LOG_DEBUG .printf("init radio f:%d txpw:%d fh:%d cfg:%d\n", freq, txPower, numFhChannels, modemCfg);
 
 	txPacketTimer.restart(txInterval);
 
@@ -49,6 +63,30 @@ void RemoteControl::mainTask() {
 
 	while(1) {
 		chThdSleep(MS2ST(100));
+
+		eventmask_t e = chEvtWaitAnyTimeout(ALL_EVENTS, TIME_IMMEDIATE);
+		if(e) {
+			printf("ev pending %d\n", e);
+
+			if(e & EventFlags::EVENT_RX_COMPLETE) {
+				clearRxPacket();
+			}
+		}
+
+		if(clearChannel()) {
+			StopWatch s;
+			printf("send rc...");
+			bool res = sendRCData();
+			int time = s.stop();
+			if(!res) {
+				printf("No ack (%dms)\n", time/1000);
+			} else {
+				printf("OK (%dms)\n", time/1000);
+			}
+		}
+
+
+		//resetFifos();
 		//if(!radio_irq::read()) {
 		//	XPCC_LOG_DEBUG << "isr missed\n";
 			//RH_RF22::isr0();
@@ -184,9 +222,8 @@ void RemoteControl::handleRxComplete() {
 		}
 		rxDataLen = sizeof(packetBuf);
 		if(!recv(packetBuf, &rxDataLen) ) {
-			rxDataLen = 0;
+			clearRxPacket();
 		}
-
 		chEvtSignal(mainThread, (eventmask_t)EventFlags::EVENT_RX_COMPLETE);
 	}
 }
@@ -199,13 +236,12 @@ void RemoteControl::handleRxStart() {
 //called from irq thread context
 void RemoteControl::handleReset() {
 	XPCC_LOG_DEBUG << "RADIO RESET OCCURED\n";
-	//reset = 1;
+	chEvtSignal(mainThread, (eventmask_t)EventFlags::EVENT_RADIO_RESET);
 }
 
 bool RemoteControl::clearChannel() {
 	uint8_t status = ezmacStatusRead();
 	if(!(status & RH_RF22_EZMAC_PKRX)) {
-		ledGreen::reset();
 		noiseFloor = ((uint16_t) noiseFloor * 31 + rssiRead()) / 32;
 		return true;
 	}
@@ -217,22 +253,41 @@ bool RemoteControl::sendRCData() {
 	for(int i = 0; i < 16; i++) {
 		p.channels[i] = axes.getChannel(i);
 	}
-
 	rcState.seq++;
 	setHeaderId(rcState.seq);
 	setHeaderFlags((char)PacketFlags::PACKET_RC);
+	//printf("seq %d\n", rcState.seq);
 
 	send((uint8_t*)&p, sizeof(RCPacket));
 
-	if(!waitRcACK()) {
+	if(!waitPacketSent()) {
+		return false;
+	}
+
+	bool ret;
+
+	StopWatch s;
+	s.start();
+	ret = waitRxStart(MS2ST(20));
+	if(!ret){
+		return false;
+	}
+	printf("st(%dms)...", s.stop()/1000);
+
+	s.start();
+	if(!waitRcACK(MS2ST(25))) {
 		rcPacketsLost++;
 		return false;
 	}
+	printf("rx(%dms)...", s.stop()/1000);
+
 	return true;
 }
 
 bool RemoteControl::waitRcACK(systime_t timeout) {
-	if(rxPacket(timeout)) {
+	RxPacket p = waitRxPacket(timeout);
+	if(p) {
+		//printf("ack %d %d\n", rcState.seq, headerId());
 		if(headerFlags() & PacketFlags::PACKET_RC_ACK) {
 			if(headerId() == rcState.seq) {
 				return true;
@@ -242,23 +297,50 @@ bool RemoteControl::waitRcACK(systime_t timeout) {
 	return false;
 }
 
-bool RemoteControl::rxPacket(systime_t timeout) {
+bool RemoteControl::waitPacketSent() {
+	if(_mode == RHModeTx) {
+		StopWatch s;
+		eventmask_t ev = chEvtWaitAnyTimeout((eventmask_t)EventFlags::EVENT_TX_COMPLETE, MS2ST(1000));
+		if(!ev) {
+			XPCC_LOG_DEBUG .printf("TX timeout!\n");
+		}
+		_lastTransmitTime = s.stop();
+		return ev & EventFlags::EVENT_TX_COMPLETE;
+	} else {
+		return true;
+	}
+}
+
+RemoteControl::RxPacket
+RemoteControl::waitRxPacket(systime_t timeout) {
 	eventmask_t evmask = chEvtWaitAnyTimeout((eventmask_t)EventFlags::EVENT_RX_COMPLETE, timeout);
 
 	if(evmask & EventFlags::EVENT_RX_COMPLETE) {
 		Packet* rx_packet = (Packet*)packetBuf;
-
 		remRssi = rx_packet->rssi;
 		remNoise = rx_packet->noise;
+
+		return std::move(RxPacket(packetBuf, &rxDataLen));
 	}
 
-	return rxDataLen;
+	return std::move(RxPacket(nullptr, nullptr));
+}
+
+bool RemoteControl::waitRxStart(systime_t timeout) {
+	eventmask_t evmask = chEvtWaitAnyTimeout((eventmask_t)EventFlags::EVENT_RX_START, timeout);
+
+	if(evmask & EventFlags::EVENT_RX_START) {
+		return true;
+	}
+
+	return false;
 }
 
 bool RemoteControl::rxTelemetryPacket(systime_t timeout) {
 	//wait for packet
-	if(rxPacket(timeout)) {
-		Packet* rx_packet = (Packet*)packetBuf;
+	RxPacket p = waitRxPacket(timeout);
+	if(p) {
+		Packet* rx_packet = (Packet*)p.payload();
 		if(rx_packet) {
 			if(headerFlags() & PacketFlags::PACKET_TELEMETRY) {
 				uint8_t size = rxDataLen - sizeof(Packet);
@@ -301,7 +383,7 @@ bool RemoteControl::rxTelemetryPacket(systime_t timeout) {
 //	}
 //}
 bool RemoteControl::waitTelemACK(systime_t timeout) {
-	if(rxPacket(timeout)) {
+	if(waitRxPacket(timeout)) {
 		Packet* rx_packet = (Packet*)packetBuf;
 		if(headerFlags() & PacketFlags::PACKET_TELEMETRY_ACK) {
 			if(headerId() == telemState.seq) {
@@ -367,9 +449,6 @@ void RemoteControl::sendTelemetryPacket() {
 
 //called from IRQ context
 void RemoteControl::handleInterrupt() {
-	//uart_print("int\n");
-//	uart_put_dec(__get_IPSR());
-//	uart_print("\n");
 	chSysLockFromISR();
 	chEvtSignalI(irqThread, IRQ_EVENT);
 	chSysUnlockFromISR();

@@ -213,6 +213,7 @@ void bluetooth_init() {
 	}
 }
 
+
 THD_WORKING_AREA(wa_main_thread, 256);
 void main_thread(void*) {
 	XPCC_LOG_DEBUG .printf("Starting clock:%d\n", SystemCoreClock);
@@ -257,9 +258,9 @@ void main_thread(void*) {
 
 
 THD_TABLE_BEGIN
+	THD_TABLE_ENTRY(radio.wa_irq_thread, "radio_irq", radio.irqTaskEntry, (void*)&radio)
   THD_TABLE_ENTRY(wa_main_thread, "main", main_thread, NULL)
   THD_TABLE_ENTRY(radio.wa_main_thread, "radio_main", radio.mainTaskEntry, (void*)&radio)
-  THD_TABLE_ENTRY(radio.wa_irq_thread, "radio_irq", radio.irqTaskEntry, (void*)&radio)
 THD_TABLE_END
 
 extern "C" void port_timer_init();
@@ -299,6 +300,13 @@ int main() {
 		if(c == 'r') {
 			NVIC_SystemReset();
 		}
+		if(c == 'b') {
+			LPC_PMU->GPREG3 = 255;
+			NVIC_SystemReset();
+		}
 
 	}
 }
+
+
+

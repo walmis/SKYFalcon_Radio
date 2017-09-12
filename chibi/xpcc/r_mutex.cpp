@@ -28,26 +28,26 @@ void RMutex::lock() {
 }
 
 bool RMutex::lock(uint32_t timeout) {
+
 	Data* d = (Data*)data;
 	msg_t status;
-	status = chBSemWaitTimeout(&d->sem, TIME_IMMEDIATE);
 
-	if(status == MSG_TIMEOUT) {
-		if(chThdGetSelfX() == d->owner) {
-			d->count++;
-			return true;
-		} else {
-			status = chBSemWaitTimeout(&d->sem, timeout);
-			if(status != MSG_OK)
-				return false;
-		}
-	}
+	chSysLock();
 
-	if(status == MSG_OK) {
-		d->owner = chThdGetSelfX();
+	if(chThdGetSelfX() == d->owner) {
 		d->count++;
-		return true;
+	} else {
+		status = chBSemWaitTimeoutS(&d->sem, timeout);
+		if(status == MSG_TIMEOUT) {
+			chSysUnlock();
+			return false;
+		}
+		d->owner = chThdGetSelfX();
+		d->count = 1;
 	}
+	chSysUnlock();
+
+	return true;
 }
 
 bool RMutex::try_lock() {
@@ -55,17 +55,19 @@ bool RMutex::try_lock() {
 }
 
 void RMutex::unlock() {
+	chSysLock();
 	Data* d = (Data*)data;
-
 	if(chThdGetSelfX() == d->owner) {
 		d->count--;
 		//XPCC_LOG_DEBUG.printf("unlock %x %d\n", d->owner, d->count);
 		if(!d->count) {
 			//XPCC_LOG_DEBUG.printf("mutex release %x\n", d->owner);
 			d->owner = 0;
-			chBSemSignal(&d->sem);
+			chBSemSignalI(&d->sem);
+			chSchRescheduleS();
 		}
 	}
+	chSysUnlock();
 }
 
 }
