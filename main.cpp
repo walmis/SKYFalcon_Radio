@@ -245,7 +245,7 @@ void main_thread(void*) {
 	while(1) {
 		chThdSleep(MS2ST(1000));
 
-		XPCC_LOG_DEBUG.printf("alive\n");
+		XPCC_LOG_DEBUG.printf("alive rssi:%d\n", radio.rssiRead());
 
 		if(boot_detach) {
 			LPC_PMU->GPREG3 = 255;
@@ -284,10 +284,8 @@ int main() {
 	NVIC_SetPriority(TIMER_16_1_IRQn, 2); //PPM decoder
 	NVIC_SetPriority(TIMER_32_0_IRQn, 0); //SW uart has max priority
 
-#ifndef SWD
 	radioSpiMaster::configurePins(radioSpiMaster::MappingSck::PIO0_10, false);
-	radioSpiMaster::initialize(radioSpiMaster::Mode::MODE_0, 100000);
-#endif
+	radioSpiMaster::initialize(radioSpiMaster::Mode::MODE_0, 8000000);
 
 	usbclk_init();
 	port_timer_init();

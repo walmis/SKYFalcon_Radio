@@ -23,7 +23,6 @@ void RemoteControl::initialize() {
 	if(!this->RH_RF22::init()) {
 		panic("radio init fail");
 	}
-	printf("init\n");
 
 	eeprom.get(&EEData::rfFrequency, freq);
 	eeprom.get(&EEData::afcPullIn, afcPullIn);
@@ -41,14 +40,11 @@ void RemoteControl::initialize() {
 	setTxPower(txPower);
 	setModemConfig(modemCfg);
 
+	setModeRx();
 }
 
 void RemoteControl::mainTask() {
 	mainThread = chThdGetSelfX();
-
-	printf("thread started\n");
-
-
 	initialize();
 
 	while(1) {
@@ -145,7 +141,7 @@ void RemoteControl::irqTask() {
 		eventmask_t events = chEvtWaitAnyTimeout(IRQ_EVENT, MS2ST(100));
 
 		if(radio_irq::read() == 0) {
-			uart_print("evt\n");
+			//uart_print("evt\n");
 			this->RH_RF22::handleInterrupt();
 		}
 	}
@@ -371,7 +367,7 @@ void RemoteControl::sendTelemetryPacket() {
 
 //called from IRQ context
 void RemoteControl::handleInterrupt() {
-	uart_print("int\n");
+	//uart_print("int\n");
 //	uart_put_dec(__get_IPSR());
 //	uart_print("\n");
 	chSysLockFromISR();
