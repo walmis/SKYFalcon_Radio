@@ -215,7 +215,6 @@ void RemoteControl::handleRxComplete() {
 	busy_rx = false;
 	rssi = (7*rssi + (uint8_t)lastRssi()) / 8;
 	ledGreen::reset();
-
 	if(available()) {
 		if(rxDataLen) {
 			XPCC_LOG_DEBUG .printf("packet not cleared\n");
@@ -224,12 +223,14 @@ void RemoteControl::handleRxComplete() {
 		if(!recv(packetBuf, &rxDataLen) ) {
 			clearRxPacket();
 		}
+
 		chEvtSignal(mainThread, (eventmask_t)EventFlags::EVENT_RX_COMPLETE);
 	}
 }
 
 //called from irq thread context
 void RemoteControl::handleRxStart() {
+	ledGreen::set();
 	chEvtSignal(mainThread, (eventmask_t)EventFlags::EVENT_RX_START);
 }
 
@@ -259,23 +260,25 @@ bool RemoteControl::sendRCData() {
 	//printf("seq %d\n", rcState.seq);
 
 	send((uint8_t*)&p, sizeof(RCPacket));
-
+	StopWatch s;
+	s.start();
 	if(!waitPacketSent()) {
 		return false;
 	}
+	printf("tx(%dms)...", s.stop()/1000);
 
 	bool ret;
 
-	StopWatch s;
+
 	s.start();
-	ret = waitRxStart(MS2ST(20));
+	ret = waitRxStart(MS2ST(5));
 	if(!ret){
 		return false;
 	}
 	printf("st(%dms)...", s.stop()/1000);
 
 	s.start();
-	if(!waitRcACK(MS2ST(25))) {
+	if(!waitRcACK(MS2ST(5))) {
 		rcPacketsLost++;
 		return false;
 	}
@@ -300,7 +303,9 @@ bool RemoteControl::waitRcACK(systime_t timeout) {
 bool RemoteControl::waitPacketSent() {
 	if(_mode == RHModeTx) {
 		StopWatch s;
+		ledRed::set();
 		eventmask_t ev = chEvtWaitAnyTimeout((eventmask_t)EventFlags::EVENT_TX_COMPLETE, MS2ST(1000));
+		ledRed::reset();
 		if(!ev) {
 			XPCC_LOG_DEBUG .printf("TX timeout!\n");
 		}
