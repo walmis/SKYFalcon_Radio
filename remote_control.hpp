@@ -24,11 +24,12 @@ enum class PacketType {
 };
 
 enum class PacketFlags {
-	FLAG_TELEM_PENDING = 1<<0,
 	PACKET_RC = 1<<1,
 	PACKET_RC_ACK = 1<<2,
 	PACKET_TELEMETRY = 1<<3,
 	PACKET_TELEMETRY_ACK = 1<<4,
+	FLAG_TELEM_PENDING = 1<<5,
+	FLAG_TELEM_REQUEST = 1<<6,
 };
 
 enum class EventFlags {

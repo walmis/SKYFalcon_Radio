@@ -256,7 +256,14 @@ bool RemoteControl::sendRCData() {
 	}
 	rcState.seq++;
 	setHeaderId(rcState.seq);
-	setHeaderFlags((char)PacketFlags::PACKET_RC);
+
+	uint8_t flags = (char)PacketFlags::PACKET_RC;
+
+	if(txAvailable()) {
+		flags |= (char)PacketFlags::FLAG_TELEM_PENDING;
+	}
+
+	setHeaderFlags(flags);
 	//printf("seq %d\n", rcState.seq);
 
 	send((uint8_t*)&p, sizeof(RCPacket));
