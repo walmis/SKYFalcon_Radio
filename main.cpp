@@ -6,6 +6,7 @@
 #include "SwUart.hpp"
 #include "Axes.hpp"
 #include "mavHandler.hpp"
+#include <xpcc/io/terminal.hpp>
 #include <xpcc/driver/connectivity/usb/USBDevice/USBSerial/USBSerial.h>
 
 #include "pindefs.hpp"
@@ -29,6 +30,7 @@ MAVHandler mavHandler;
 StaticIOBuffer<256> txbuf;
 StaticIOBuffer<64> rxbuf;
 xpcc::lpc11::BufferedUart uart1(115200, txbuf, rxbuf);
+xpcc::IOStream io_usb(usb);
 
 __attribute__((section(".fwversion"),used)) const uint32_t fw[5] = {0};
 
@@ -142,8 +144,7 @@ class DFU : public DFUHandler {
 	void do_detach() {
 		boot_detach = true;
 	}
-};
-DFU dfu;
+} dfu;
 
 void usbclk_init() {
 
@@ -213,11 +214,38 @@ void bluetooth_init() {
 	}
 }
 
+class Term : public xpcc::Terminal {
+public:
+	Term(xpcc::IOStream& st) : Terminal(st) {
+		prompt = nullptr;
+		echo = false;
+	}
+	void handleCommand(uint8_t argc, char* argv[]) {
+		//stream.printf("command %s %s %d\n", argv[0], argv[1], argc);
+		if(cmd(0, "&rr")) {
+			uint8_t v = radio.spiRead(arg(1));
+			stream.printf("$%s,%x\n", argv[1], v);
+			stream.flush();
+		}
+		if(cmd(0, "&rw")) {
+			if(argc == 3) {
+				int reg = arg(1);
+				int val = arg(2);
+				radio.spiWrite(reg, val);
+				stream.printf("$%s,%s\n", argv[1], argv[2]);
+			}
+		}
+	}
+};
 
+Term term(io_usb);
+extern "C" uint8_t __usbram_start;
+extern "C" uint8_t __usbram_end;
 THD_WORKING_AREA(wa_main_thread, 256);
 void main_thread(void*) {
 	XPCC_LOG_DEBUG .printf("Starting clock:%d\n", SystemCoreClock);
 	XPCC_LOG_DEBUG .printf("Free heap:%d\n", (int)(&__heap_end__)-(int)(&__heap_base__));
+	XPCC_LOG_DEBUG .printf("USB RAM @ %x %d\n", (uint32_t)&__usbram_start, (uint32_t)&__usbram_end-(uint32_t)&__usbram_start);
 
 #if 0
 	bt_rst::setOutput(0);
@@ -243,25 +271,46 @@ void main_thread(void*) {
 
 	//LPC_PMU->GPREG3 = 0; //tell bootloader: boot OK
 
+	xpcc::PeriodicTimer<> t(1000);
 	while(1) {
-		chThdSleep(MS2ST(1000));
+		if(t.isExpired()) {
+			//chThdSleep(MS2ST(1000));
+			ledRed::toggle();
+			XPCC_LOG_DEBUG.printf("alive rssi:%d\n", radio.rssiRead());
+			//io_usb.printf("hello\n");
+			//usb.write('a');
 
-		XPCC_LOG_DEBUG.printf("alive rssi:%d\n", radio.rssiRead());
 
-		if(boot_detach) {
+			if(boot_detach) {
+				LPC_PMU->GPREG3 = 255;
+				NVIC_SystemReset();
+			}
+		}
+		term.readChar();
+
+
+		lpc11u::Watchdog::feed();
+
+		int16_t c = uart1.read();
+		if(c == 'r') {
+			NVIC_SystemReset();
+		}
+		if(c == 'b') {
 			LPC_PMU->GPREG3 = 255;
 			NVIC_SystemReset();
 		}
-
 	}
 }
 
 
 THD_TABLE_BEGIN
 	THD_TABLE_ENTRY(radio.wa_irq_thread, "radio_irq", radio.irqTaskEntry, (void*)&radio)
-  THD_TABLE_ENTRY(wa_main_thread, "main", main_thread, NULL)
   THD_TABLE_ENTRY(radio.wa_main_thread, "radio_main", radio.mainTaskEntry, (void*)&radio)
+  THD_TABLE_ENTRY(wa_main_thread, "main", main_thread, NULL)
 THD_TABLE_END
+
+
+
 
 extern "C" void port_timer_init();
 int main() {
@@ -271,8 +320,8 @@ int main() {
 
 	NVIC_EnableIRQ(WDT_IRQn);
 
-	ledRed::setOutput(true);
-	ledGreen::setOutput(true);
+	ledRed::setOutput(0);
+	ledGreen::setOutput(0);
 
 	usb.addInterfaceHandler(dfu);
 
@@ -293,17 +342,6 @@ int main() {
 	chSysInit();
 
 	while(1) {
-
-		lpc11u::Watchdog::feed();
-
-		int16_t c = uart1.read();
-		if(c == 'r') {
-			NVIC_SystemReset();
-		}
-		if(c == 'b') {
-			LPC_PMU->GPREG3 = 255;
-			NVIC_SystemReset();
-		}
 
 	}
 }

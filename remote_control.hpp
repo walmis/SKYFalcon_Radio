@@ -218,6 +218,8 @@ public:
     	return mode() == RHModeIdle;
     }
 
+    void setTestMode(bool en);
+
     bool waitPacketSent() override;
     uint32_t lastTransmitTime() { return _lastTransmitTime; }
 

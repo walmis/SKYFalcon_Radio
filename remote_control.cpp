@@ -73,17 +73,17 @@ void RemoteControl::mainTask() {
 			}
 		}
 
-		if(clearChannel()) {
-			StopWatch s;
-			printf("send rc...");
-			bool res = sendRCData();
-			int time = s.stop();
-			if(!res) {
-				printf("No ack (%dms)\n", time/1000);
-			} else {
-				printf("OK (%dms)\n", time/1000);
-			}
-		}
+//		if(clearChannel()) {
+//			StopWatch s;
+//			printf("send rc...");
+//			bool res = sendRCData();
+//			int time = s.stop();
+//			if(!res) {
+//				printf("No ack (%dms)\n", time/1000);
+//			} else {
+//				printf("OK (%dms)\n", time/1000);
+//			}
+//		}
 
 
 		//resetFifos();
@@ -170,6 +170,10 @@ void RemoteControl::mainTask() {
 //		}
 
 	}
+}
+
+void RemoteControl::setTestMode(bool en) {
+	
 }
 
 void RemoteControl::irqTask() {
