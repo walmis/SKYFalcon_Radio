@@ -25,8 +25,7 @@ namespace xpcc {
 	}
 
 	bool Event::wait(uint32_t timeout_ms) {
-		if(TickerTask::inInterruptContext()) return false;
-    binary_semaphore_t* bsem = (binary_semaphore_t*)event;
+		binary_semaphore_t* bsem = (binary_semaphore_t*)event;
 
 		//(bool)isPending(); //this resets the event into waiting state
 
@@ -38,8 +37,7 @@ namespace xpcc {
 	}
 
 	bool Event::wait_us(uint32_t timeout_us) {
-		if(TickerTask::inInterruptContext()) return false;
-    binary_semaphore_t* bsem = (binary_semaphore_t*)event;
+		binary_semaphore_t* bsem = (binary_semaphore_t*)event;
 
 		if(timeout_us == 0xFFFFFFFF) {
 			return chBSemWait(bsem) == MSG_OK;

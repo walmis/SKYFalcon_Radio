@@ -21,4 +21,8 @@ void free(void* ptr) {
 	chHeapFree(ptr);
 }
 
+void* memalign(size_t align, size_t size) {
+	return chHeapAllocAligned(0, size, align);
+}
+
 

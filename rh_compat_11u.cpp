@@ -1,6 +1,6 @@
 
 #include <xpcc/architecture.hpp>
-
+#include <xpcc/debug.hpp>
 #include <wirish.h>
 #include <RHGenericSPI.h>
 #include <stdarg.h>

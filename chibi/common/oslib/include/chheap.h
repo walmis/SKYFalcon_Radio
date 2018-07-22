@@ -80,7 +80,6 @@ typedef union heap_header heap_header_t;
  * @brief   Memory heap block header.
  */
 union heap_header {
-  stkalign_t align;
   struct {
     heap_header_t       *next;      /**< @brief Next block in free list.    */
     size_t              pages;      /**< @brief Size of the area in pages.  */
@@ -95,7 +94,7 @@ union heap_header {
  * @brief   Structure describing a memory heap.
  */
 struct memory_heap {
-  memgetfunc_t          provider;   /**< @brief Memory blocks provider for
+  memgetfunc2_t         provider;   /**< @brief Memory blocks provider for
                                                 this heap.                  */
   heap_header_t         header;     /**< @brief Free blocks list header.    */
 #if CH_CFG_USE_MUTEXES == TRUE
@@ -163,12 +162,13 @@ static inline void *chHeapAlloc(memory_heap_t *heapp, size_t size) {
  *          same value aligned to the next @p CH_HEAP_ALIGNMENT multiple.
  *
  * @param[in] p         pointer to the memory block
+ * @return              Size of the block.
  *
  * @api
  */
 static inline size_t chHeapGetSize(const void *p) {
 
-  return ((heap_header_t *)p)->used.size;
+  return ((heap_header_t *)p - 1U)->used.size;
 }
 
 #endif /* CH_CFG_USE_HEAP == TRUE */

@@ -7,6 +7,7 @@
 
 #include "remote_control.hpp"
 #include  "Axes.hpp"
+#include <xpcc/debug.hpp>
 
 class StopWatch {
 public:

@@ -7,7 +7,7 @@
 #include "Axes.hpp"
 #include "mavHandler.hpp"
 #include <xpcc/io/terminal.hpp>
-#include <xpcc/driver/connectivity/usb/USBDevice/USBSerial/USBSerial.h>
+#include <xpcc/driver/usb.hpp>
 
 #include "pindefs.hpp"
 #include "remote_control.hpp"
@@ -237,6 +237,7 @@ public:
 		}
 	}
 };
+#include <malloc.h>
 
 Term term(io_usb);
 extern "C" uint8_t __usbram_start;
@@ -245,7 +246,6 @@ THD_WORKING_AREA(wa_main_thread, 256);
 void main_thread(void*) {
 	XPCC_LOG_DEBUG .printf("Starting clock:%d\n", SystemCoreClock);
 	XPCC_LOG_DEBUG .printf("Free heap:%d\n", (int)(&__heap_end__)-(int)(&__heap_base__));
-	XPCC_LOG_DEBUG .printf("USB RAM @ %x %d\n", (uint32_t)&__usbram_start, (uint32_t)&__usbram_end-(uint32_t)&__usbram_start);
 
 #if 0
 	bt_rst::setOutput(0);
@@ -266,7 +266,6 @@ void main_thread(void*) {
 //
 	usb.connect();
 	usbConnect::setOutput(true);
-
 
 
 	//LPC_PMU->GPREG3 = 0; //tell bootloader: boot OK
